@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Stagger
 {
@@ -45,7 +48,7 @@ namespace Stagger
             }
         }
 
-        public void writeConll(StreamWriter writer, TaggedToken[][] sentences, bool plain)
+        public void WriteConll(StreamWriter writer, TaggedToken[][] sentences, bool plain)
         {
             foreach (TaggedToken[] sentence in sentences)
             {
@@ -53,23 +56,23 @@ namespace Stagger
                 {
                     TaggedToken token = sentence[i];
 
-                    writer.Write($"{tokenToString(token, i, plain)}{Environment.NewLine}");
+                    writer.Write($"{TokenToString(token, i, plain)}{Environment.NewLine}");
                 }
 
                 writer.Write(Environment.NewLine);
             }
         }
 
-        public void writeConllSentence(StreamWriter writer, TaggedToken[] sentence, bool plain)
+        public void WriteConllSentence(StreamWriter writer, TaggedToken[] sentence, bool plain)
         {
             TaggedToken[][] sentences = new TaggedToken[1][];
 
             sentences[0] = sentence;
 
-            writeConll(writer, sentences, plain);
+            WriteConll(writer, sentences, plain);
         }
 
-        public void writeConllGold(StreamWriter writer, TaggedToken[] tokens, TaggedToken[] goldTokens, bool plain)
+        public void WriteConllGold(StreamWriter writer, TaggedToken[] tokens, TaggedToken[] goldTokens, bool plain)
         {
             if (tokens.Length != goldTokens.Length)
             {
@@ -82,260 +85,290 @@ namespace Stagger
 
                 TaggedToken gold = goldTokens[i];
 
-                writer.Write($"{tokenToString(token, i, plain)}{Environment.NewLine}");
+                writer.Write($"{TokenToString(token, i, plain)}{Environment.NewLine}");
 
                 if (!token.ConsistentWith(gold))
                 {
-                    writer.Write($"#{tokenToString(gold, i, plain)}{Environment.NewLine}");
+                    writer.Write($"#{TokenToString(gold, i, plain)}{Environment.NewLine}");
                 }
             }
 
             writer.Write(Environment.NewLine);
         }
 
-        /**
-         * Converts a single token to a line in a CoNLL file.
-         *
-         * @param token     tokens to convert
-         * @param idx       0-based index within the sentence
-         * @param plain     use plain output rather than CoNLL?
-         * @throws TagNameException if any tag value is invalid
-         */
-        private string tokenToString(TaggedToken token, int idx, bool plain)
+        private string TokenToString(TaggedToken token, int index, bool plain)
         {
-            if (plain) return token.token.value + "\t" +
-                              posTagSet.getTagName(token.posTag);
-            string[]
-            pos = null;
+            if (plain)
+            {
+                return $"{token.Token.Value}\t{PosTagSet.GetTagName(token.PosTag)}";
+            }
+
+            string[] pos = null;
+
             string neTag = null;
+
             string neType = null;
-            if (token.posTag >= 0)
-                pos = posTagSet.getTagName(token.posTag).split("\\|", 2);
-            if (token.neTag >= 0)
-                neTag = NeTagSet.getTagName(token.neTag);
-            if (token.neTypeTag >= 0)
-                neType = NeTypeTagSet.getTagName(token.neTypeTag);
-            return
-                (idx + 1) + "\t" +
-                token.token.value + "\t" +
-                ((token.lf == null) ? "" : token.lf) + "\t" +
-                ((pos == null) ? "_" : pos[0]) + "\t" +
-                ((pos == null) ? "_" : pos[0]) + "\t" +
-                ((pos == null || pos.Length < 2) ? "_" : pos[1]) + "\t" +
-                "_\t" +
-                "_\t" +
-                "_\t" +
-                "_\t" +
-                ((neTag == null) ? "_" : neTag) + "\t" +
-                ((neType == null) ? "_" : neType) + "\t" +
-                ((token.id == null) ? "_" : token.id);
+
+            if (token.PosTag >= 0)
+            {
+                pos = PosTagSet.GetTagName(token.PosTag).Split(new[] { '\\', '|' }, 2);
+            }
+
+            if (token.NeTag >= 0)
+            {
+                neTag = NeTagSet.GetTagName(token.NeTag);
+            }
+
+            if (token.NeTypeTag >= 0)
+            {
+                neType = NeTypeTagSet.GetTagName(token.NeTypeTag);
+            }
+
+            return $"{index + 1}\t{token.Token.Value}\t{token.Lemma ?? ""}\t{((pos == null) ? "_" : pos[0])}\t{((pos == null) ? "_" : pos[0])}\t{((pos == null || pos.Length < 2) ? "_" : pos[1])}\t_\t_\t_\t_\t{neTag ?? "_"}\t{neType ?? "_"}\t{token.Id ?? "_"}";
         }
 
-        /**
-         * Reads a number of .conll files.
-         *
-         * @param filenames names of files
-         * @param extend    if true, unknown tags are created
-         * @param plain     use plain format rather than CoNLL?
-         * @return          array of sentences (arrays of TaggedToken)
-         * @throws FormatException if the syntax is invalid
-         * @throws TagNameException if any tag value is invalid
-         * @throws IOException from the reader
-         */
-        public TaggedToken[][][] readConllFiles(
-        string[] filenames, bool extend, bool plain)
+        public TaggedToken[][][] ReadConllFiles(string[] filePaths, bool extend, bool plain)
         {
-            int nFiles = filenames.Length;
-            TaggedToken[][][] files = new TaggedToken[nFiles][][];
-            int fileIdx = 0;
-            for (string name : filenames)
+            TaggedToken[][][] files = new TaggedToken[filePaths.Length][][];
+
+            int fileIndex = 0;
+
+            foreach (string filePath in filePaths)
             {
-                string id = (new File(name)).getName().split("\\.")[0];
-                files[fileIdx++] = readConll(name, id, extend, plain);
+                string id = Path.GetFileNameWithoutExtension(filePath);
+
+                files[fileIndex++] = ReadConll(filePath, id, extend, plain);
             }
+
             return files;
         }
 
-        /**
-         * Reads all sentences in the given file, until EOF.
-         *
-         * @param filename  name of the file to read
-         * @param fileID    identifier of the file (used for token IDs)
-         * @param extend    if true, unknown tags are created
-         * @param plain     use plain format rather than CoNLL?
-         * @return          null on EOF, otherwise array of tokens
-         * @throws FormatException if the syntax is invalid
-         * @throws TagNameException if any tag value is invalid
-         * @throws IOException from the reader
-         */
-        public TaggedToken[][] readConll(
-        string filename, string fileID, bool extend, bool plain)
+        public TaggedToken[][] ReadConll(string filePath, string fileId, bool extend, bool plain)
         {
-            if (fileID == null)
+            if (fileId == null)
             {
-                fileID = (new File(filename)).getName().split("\\.")[0];
+                fileId = Path.GetFileNameWithoutExtension(filePath);
             }
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(
-                    new FileInputStream(filename), "UTF-8"));
-            TaggedToken[][] data = readConll(reader, fileID, extend, plain);
-            reader.close();
+
+            TaggedToken[][] data;
+
+            using (StreamReader reader = new StreamReader(filePath, Encoding.UTF8))
+            {
+                data = ReadConll(reader, fileId, extend, plain);
+
+                reader.Close();
+            }
+
             return data;
         }
 
-        /**
-         * Reads all sentences in the given file, until EOF.
-         *
-         * @param reader    BufferedReader to read from
-         * @param fileID    identifier of the file (used for token IDs)
-         * @param extend    if true, unknown tags are created
-         * @param plain     use plain format rather than CoNLL?
-         * @return          null on EOF, otherwise array of tokens
-         * @throws FormatException if the syntax is invalid
-         * @throws TagNameException if any tag value is invalid
-         * @throws IOException from the reader
-         */
-        public TaggedToken[][] readConll(
-        BufferedReader reader, string fileID, bool extend, bool plain)
+        public TaggedToken[][] ReadConll(StreamReader reader, string fileId, bool extend, bool plain)
         {
-            ArrayList<TaggedToken[]> sentences = new ArrayList<TaggedToken[]>();
-            ArrayList<TaggedToken> sentence = new ArrayList<TaggedToken>();
+            List<TaggedToken[]> sentences = new List<TaggedToken[]>();
+
+            List<TaggedToken> sentence = new List<TaggedToken>();
+
             Tokenizer tokenizer;
-            if (Language.equals("sv"))
-                tokenizer = new SwedishTokenizer(new StringReader(""));
-            else if (Language.equals("en"))
-                tokenizer = new EnglishTokenizer(new StringReader(""));
-            else if (Language.equals("zh"))
-                tokenizer = null;
-            else
-                tokenizer = new LatinTokenizer(new StringReader(""));
-            string line;
-            int sentIdx = 0;
-            int tokIdx = 0;
-            while ((line = reader.readLine()) != null)
+
+            if (Language.Equals("sv"))
             {
-                if (line.equals(""))
+                tokenizer = new SwedishTokenizer(new StringReader(""));
+            }
+            else if (Language.Equals("en"))
+            {
+                tokenizer = new EnglishTokenizer(new StringReader(""));
+            }
+            else if (Language.Equals("zh"))
+            {
+                tokenizer = null;
+            }
+            else
+            {
+                tokenizer = new LatinTokenizer(new StringReader(""));
+            }
+
+            string line;
+
+            int sentenceIndex = 0;
+
+            int tokenIndex = 0;
+
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (line.Equals(""))
                 {
-                    if (sentence.size() > 0)
+                    if (sentence.Count > 0)
                     {
-                        TaggedToken[] tokensArray =
-                            new TaggedToken[sentence.size()];
-                        sentences.add(sentence.toArray(tokensArray));
-                        sentence = new ArrayList<TaggedToken>();
-                        sentIdx++;
-                        tokIdx = 0;
+                        sentences.Add(sentence.ToArray());
+
+                        sentence = new List<TaggedToken>();
+
+                        sentenceIndex++;
+
+                        tokenIndex = 0;
                     }
+
                     continue;
                 }
-                if (line.startsWith("#")) continue;
-                string[] fields = (plain) ? line.split("\\s+")
-                                         : line.split("\t", -1);
+
+                if (line.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                string[] fields = plain ? Regex.Split(line, "\\s+") : line.Split('\t');
+
                 string posString = null;
+
                 string neString = null;
+
                 string neTypeString = null;
-                string tokenID = null;
-                string text = null;
-                string lf = null;
-                int nFields = fields.Length;
+
+                string tokenId = null;
+
+                string text;
+
+                string lemma = null;
+
+                int fieldsLength = fields.Length;
+
                 if (plain)
                 {
-                    if (nFields < 1 || nFields > 2)
+                    if (fieldsLength < 1 || fieldsLength > 2)
                     {
-                        throw new FormatException(
-                            "Expected 1 or 2 fields, found " + fields.Length +
-                            " in: " + line);
+                        throw new FormatException($"Expected 1 or 2 fields, found {fields.Length} in: {line}");
                     }
+
                     text = fields[0];
-                    if (nFields == 2) posString = fields[1];
+
+                    if (fieldsLength == 2)
+                    {
+                        posString = fields[1];
+                    }
                 }
                 else
                 {
-                    if (nFields < 6)
-                        throw new FormatException(
-                            "Expected at least 6 fields, found " + fields.Length +
-                            " in: " + line);
-                    text = fields[1];
-                    lf = fields[2];
-                    if (lf.equals("") || (lf.equals("_") && !text.equals("_")))
-                        lf = null;
-                    if (!fields[3].equals("_"))
+                    if (fieldsLength < 6)
                     {
-                        if (!(fields[5].equals("") || fields[5].equals("_")))
-                            posString = fields[3] + "|" + fields[5];
-                        else
-                            posString = fields[3];
+                        throw new FormatException($"Expected at least 6 fields, found {fields.Length} in: {line}");
                     }
-                    if (nFields >= 12 && !fields[10].equals("_"))
+
+                    text = fields[1];
+
+                    lemma = fields[2];
+
+                    if (lemma.Equals("") || (lemma.Equals("_") && !text.Equals("_")))
+                    {
+                        lemma = null;
+                    }
+
+                    if (!fields[3].Equals("_"))
+                    {
+                        if (!(fields[5].Equals("") || fields[5].Equals("_")))
+                        {
+                            posString = fields[3] + "|" + fields[5];
+                        }
+                        else
+                        {
+                            posString = fields[3];
+                        }
+                    }
+
+                    if (fieldsLength >= 12 && !fields[10].Equals("_"))
+                    {
                         neString = fields[10];
-                    if (nFields >= 12 && !fields[11].equals("_"))
+                    }
+
+                    if (fieldsLength >= 12 && !fields[11].Equals("_"))
+                    {
                         neTypeString = fields[11];
-                    if (nFields >= 13 && !fields[12].equals("_"))
-                        tokenID = fields[12];
+                    }
+
+                    if (fieldsLength >= 13 && !fields[12].Equals("_"))
+                    {
+                        tokenId = fields[12];
+                    }
                 }
-                if (text.equals(""))
+
+                if (text.Equals(""))
                 {
-                    throw new FormatException("Text field empty in: " + line);
+                    throw new FormatException($"Text field empty in: {line}");
                 }
-                if (tokenID == null)
+
+                if (tokenId == null)
                 {
-                    tokenID = fileID + ":" + sentIdx + ":" + tokIdx;
+                    tokenId = $"{fileId}:{sentenceIndex}:{tokenIndex}";
                 }
+
                 TaggedToken token;
-                // TODO: consider interpreting z as the offset if the ID is on the
-                // form x:y:z
+
                 if (tokenizer == null)
                 {
-                    token = new TaggedToken(
-                        new Token(Token.TOK_UNKNOWN, text, 0), tokenID);
+                    token = new TaggedToken(new Token(TokenType.Unknown, text, 0), tokenId);
                 }
                 else
                 {
-                    // Use the tokenizer to find the token type of this file
-                    tokenizer.yyreset(new StringReader(text));
-                    Token subToken = tokenizer.yylex();
-                    // Note that only the first subtoken is used, in case the
-                    // token is complex.
-                    token = new TaggedToken(
-                                        new Token(subToken.type, text, 0), tokenID);
+                    tokenizer.Reset(new StringReader(text));
+
+                    Token subToken = tokenizer.Tokenize();
+
+                    token = new TaggedToken(new Token(subToken.Type, text, 0), tokenId);
                 }
+
                 int posTag = -1, neTag = -1, neTypeTag = -1;
+
                 try
                 {
                     if (posString != null)
-                        posTag = posTagSet.getTagID(posString, extend);
+                    {
+                        posTag = PosTagSet.GetTagId(posString, extend);
+                    }
+
                     if (neString != null)
                     {
-                        if (neString.equals("U")) neString = "B";
-                        else if (neString.equals("L")) neString = "I";
-                        neTag = NeTagSet.getTagID(neString, false);
+                        if (neString.Equals("U"))
+                        {
+                            neString = "B";
+                        }
+                        else if (neString.Equals("L"))
+                        {
+                            neString = "I";
+                        }
+
+                        neTag = NeTagSet.GetTagId(neString, false);
                     }
                 }
                 catch (TagNameException e)
                 {
-                    System.err.println(line);
-                    throw e;
-                }
-                if (neTypeString != null)
-                    neTypeTag = NeTypeTagSet.getTagID(neTypeString, extend);
-                token.lf = lf;
-                token.posTag = posTag;
-                token.neTag = neTag;
-                token.neTypeTag = neTypeTag;
-                sentence.add(token);
+                    Console.WriteLine(e);
 
-                tokIdx++;
+                    throw;
+                }
+
+                if (neTypeString != null)
+                {
+                    neTypeTag = NeTypeTagSet.GetTagId(neTypeString, extend);
+                }
+
+                token.Lemma = lemma;
+
+                token.PosTag = posTag;
+
+                token.NeTag = neTag;
+
+                token.NeTypeTag = neTypeTag;
+
+                sentence.Add(token);
+
+                tokenIndex++;
             }
-            // In case the last sentence was not followed by an empty line, make
-            // sure to add it.
-            if (sentence.size() > 0)
+
+            if (sentence.Count > 0)
             {
-                TaggedToken[] tokensArray =
-                    new TaggedToken[sentence.size()];
-                sentences.add(sentence.toArray(tokensArray));
+                sentences.Add(sentence.ToArray());
             }
-            if (sentences.size() == 0) return null;
-            TaggedToken[][] sentenceArray = new TaggedToken[sentences.size()][];
-            return sentences.toArray(sentenceArray);
+
+            return sentences.Count == 0 ? null : sentences.ToArray();
         }
     }
 }
