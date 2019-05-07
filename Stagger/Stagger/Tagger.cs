@@ -1,18 +1,20 @@
-﻿namespace Stagger
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Stagger
 {
     public class Tagger
     {
-        static final long serialVersionUID = 2066690554149210181L;
-
         // During training, words with fewer occurences than this in the training
         // set are considered unknown. Empirically, 3 seems to be a good value.
-        protected final static int countLimit = 3;
+        protected const int countLimit = 3;
         // If true, the countLimit value is used to create "unknown" words.
-        protected boolean trainingMode;
+        protected bool trainingMode;
         // A list of POS tags each word form can take.
         protected Lexicon posLexicon;
         // Lists of possible POS tags for each token type
-        protected int[][] tokTypeTags;
+        protected int[][] tokenTypeTags;
         // Perceptrons for the two tasks: POS and NER.
         protected Perceptron posPerceptron;
         protected Perceptron nePerceptron;
@@ -22,27 +24,27 @@
         protected int posBeamSize;
         protected int neBeamSize;
         // Word representations for the two tasks.
-        protected ArrayList<Dictionary> posDictionaries;
-        protected ArrayList<Embedding> posEmbeddings;
-        protected ArrayList<Dictionary> neDictionaries;
-        protected ArrayList<Embedding> neEmbeddings;
+        protected List<Dictionary> posDictionaries;
+        protected List<Embedding> posEmbeddings;
+        protected List<Dictionary> neDictionaries;
+        protected List<Embedding> neEmbeddings;
         // Array of POS tags that unknown words can have.
         protected int[] openTags;
         // Whether or not this tagger performs the given task.
-        protected boolean hasPos, hasNE;
+        protected bool hasPos, hasNE;
         // Should known words be extended?
-        protected boolean extendLexicon = true;
+        protected bool extendLexicon = true;
 
         // Maximum number of training iterations.
         protected int maxPosIters = 16;
         protected int maxNEIters = 16;
         // Maximum number of features per decision, don't be cheap here.
-        protected static final int maxFeats = 0x80;
+        protected const int maxFeats = 0x80;
         // Interval (in tokens) at which to accumulate weight vector.
-        protected static final int accumulateLimit = 0x1000;
+        protected const int accumulateLimit = 0x1000;
 
-        protected HashSet<String> allowedPrefixes = null;
-        protected HashSet<String> allowedSuffixes = null;
+        protected HashSet<string> allowedPrefixes = null;
+        protected HashSet<string> allowedSuffixes = null;
 
         protected void setMaxPosIters(int n)
         {
@@ -54,12 +56,12 @@
             maxNEIters = n;
         }
 
-        public void setExtendLexicon(boolean x)
+        public void setExtendLexicon(bool x)
         {
             extendLexicon = x;
         }
 
-        public void setHasNE(boolean x)
+        public void setHasNE(bool x)
         {
             hasNE = x;
         }
@@ -79,10 +81,10 @@
             this.taggedData = taggedData;
             this.posBeamSize = posBeamSize;
             this.neBeamSize = neBeamSize;
-            posDictionaries = new ArrayList<Dictionary>();
-            posEmbeddings = new ArrayList<Embedding>();
-            neDictionaries = new ArrayList<Dictionary>();
-            neEmbeddings = new ArrayList<Embedding>();
+            posDictionaries = new List<Dictionary>();
+            posEmbeddings = new List<Embedding>();
+            neDictionaries = new List<Dictionary>();
+            neEmbeddings = new List<Embedding>();
             posLexicon = new Lexicon();
             computeOpenTags();
         }
@@ -92,22 +94,22 @@
             return posLexicon;
         }
 
-        public void setPosDictionaries(ArrayList<Dictionary> dictionaries)
+        public void setPosDictionaries(List<Dictionary> dictionaries)
         {
             posDictionaries = dictionaries;
         }
 
-        public void setNEDictionaries(ArrayList<Dictionary> dictionaries)
+        public void setNEDictionaries(List<Dictionary> dictionaries)
         {
             neDictionaries = dictionaries;
         }
 
-        public void setPosEmbeddings(ArrayList<Embedding> embeddings)
+        public void setPosEmbeddings(List<Embedding> embeddings)
         {
             posEmbeddings = embeddings;
         }
 
-        public void setNEEmbeddings(ArrayList<Embedding> embeddings)
+        public void setNEEmbeddings(List<Embedding> embeddings)
         {
             neEmbeddings = embeddings;
         }
@@ -128,7 +130,7 @@
          * The default is to not use lemmas at all, but inflectional languages
          * should override this method.
          */
-        protected String getLemma(TaggedToken token)
+        protected string getLemma(TaggedToken token)
         {
             return null;
         }
@@ -136,61 +138,63 @@
         /**
          * Constructs POS tag lexicon, and generalized token lexicon.
          */
-        public void buildLexicons(TaggedToken[][] sents)
+        public void buildLexicons(TaggedToken[][] sentences)
         {
-            boolean[][] hasTag =
-                new boolean[Token.TOK_TYPES][taggedData.getPosTagSet().size()];
-            for (TaggedToken[] sent : sents)
+            const int types = (int)TokenType.Types;
+
+            bool[,] hasTag = new bool[types, taggedData.PosTagSet.Size];
+
+            foreach (TaggedToken[] sentence in sentences)
             {
-                for (TaggedToken tok : sent)
+                foreach (TaggedToken token in sentence)
                 {
-                    if (tok.posTag >= 0)
+                    if (token.PosTag >= 0)
                     {
-                        hasTag[tok.token.type][tok.posTag] = true;
-                        posLexicon.addEntry(tok.token.value, tok.lf, tok.posTag, 1);
+                        hasTag[(int)token.Token.Type, token.PosTag] = true;
+
+                        posLexicon.AddEntry(token.Token.Value, token.Lemma, token.PosTag, 1);
                     }
                 }
-
             }
-            // Create an array tokTypeTags[type] for each token type, which
-            // contains all the POS tags that have occured with this token type
-            // in the training corpus
-            tokTypeTags = new int[Token.TOK_TYPES][];
-            for (int tokType = 0; tokType < Token.TOK_TYPES; tokType++)
+
+            tokenTypeTags = new int[types][];
+
+            for (int tokenType = 0; tokenType < types; tokenType++)
             {
-                int nTags = 0;
-                for (int tag : openTags)
+                int tagsCount = openTags.Count(openTag => hasTag[tokenType, openTag]);
+
+                if (tagsCount == 0)
                 {
-                    if (hasTag[tokType][tag]) nTags++;
-                }
-                if (nTags == 0)
-                {
-                    // If this tag type is not in the corpus, allow all open POS
-                    // tags
-                    tokTypeTags[tokType] = openTags;
+                    tokenTypeTags[tokenType] = openTags;
                 }
                 else
                 {
-                    tokTypeTags[tokType] = new int[nTags];
+                    tokenTypeTags[tokenType] = new int[tagsCount];
+
                     int j = 0;
-                    for (int tag : openTags)
+
+                    foreach (int openTag in openTags)
                     {
-                        if (hasTag[tokType][tag]) tokTypeTags[tokType][j++] = tag;
+                        if (hasTag[tokenType, openTag])
+                        {
+                            tokenTypeTags[tokenType][j++] = openTag;
+                        }
                     }
-                    assert(j == nTags);
+
+                    if (j != tagsCount)
+                    {
+                        throw new Exception("Incorrect number of Tags.");
+                    }
+
                     for (int k = 0; k < j - 1; k++)
-                        assert(tokTypeTags[tokType][k] < tokTypeTags[tokType][k + 1]);
+                    {
+                        if (!(tokenTypeTags[tokenType][k] < tokenTypeTags[tokenType][k + 1]))
+                        {
+                            throw new Exception("Incorrect Tags order.");
+                        }
+                    }
                 }
             }
-            /*
-            for(int tokType=0; tokType<Token.TOK_TYPES; tokType++) {
-                System.out.print(tokType + ":");
-                for(int tag : tokTypeTags[tokType]) {
-                    System.out.print(" " + tag);
-                }
-                System.out.println("");
-            }
-            */
         }
 
         /**
@@ -201,7 +205,7 @@
         protected void computeOpenTags()
         {
             openTags = new int[taggedData.getPosTagSet().size()];
-            for (int i = 0; i < openTags.length; i++) openTags[i] = i;
+            for (int i = 0; i < openTags.Length; i++) openTags[i] = i;
         }
 
         /**
@@ -242,12 +246,12 @@
         {
             posPerceptron.StartTraining();
 
-            // Create a list of integers 0 to trainSents.length-1 (inclusive),
+            // Create a list of ints 0 to trainSents.Length-1 (inclusive),
             // which will be the order than sentences are processed during a
             // training iteration. This may be permuted at each iteration.
-            ArrayList<Integer> trainOrder =
-                new ArrayList<Integer>(trainSents.length);
-            for (int i = 0; i < trainSents.length; i++) trainOrder.add(new Integer(i));
+            List<int> trainOrder =
+                new List<int>(trainSents.Length);
+            for (int i = 0; i < trainSents.Length; i++) trainOrder.Add(new int(i));
 
             // TODO: cache training set features+values
 
@@ -267,10 +271,10 @@
                 {
                     TaggedToken[] trainSent = trainSents[sentIdx];
                     // If the sentence is not POS tagged, skip it
-                    if (trainSent.length == 0 || trainSent[0].PosTag < 0)
+                    if (trainSent.Length == 0 || trainSent[0].PosTag < 0)
                         continue;
-                    TaggedToken[] taggedSent = new TaggedToken[trainSent.length];
-                    for (int i = 0; i < trainSent.length; i++)
+                    TaggedToken[] taggedSent = new TaggedToken[trainSent.Length];
+                    for (int i = 0; i < trainSent.Length; i++)
                         taggedSent[i] = new TaggedToken(trainSent[i]);
                     tagPos(taggedSent, false);
                     int oldPosCorrect = trainEvaluation.posCorrect;
@@ -278,12 +282,12 @@
                     // Only perform weight updates if the sentence was incorrectly
                     // tagged
                     if (trainEvaluation.posCorrect !=
-                       oldPosCorrect + trainSent.length)
+                       oldPosCorrect + trainSent.Length)
                     {
                         posUpdateWeights(taggedSent, trainSent);
                     }
                     // Check if it is time to accumulate perceptron weights.
-                    tokenCount += trainSent.length;
+                    tokenCount += trainSent.Length;
                     if (tokenCount > accumulateLimit)
                     {
                         posPerceptron.AccumulateWeights();
@@ -300,11 +304,11 @@
                 }
 
                 Evaluation devEvaluation = new Evaluation();
-                for (int sentIdx = 0; sentIdx < devSents.length; sentIdx++)
+                for (int sentIdx = 0; sentIdx < devSents.Length; sentIdx++)
                 {
                     TaggedToken[] devSent = devSents[sentIdx];
-                    TaggedToken[] taggedSent = new TaggedToken[devSent.length];
-                    for (int i = 0; i < devSent.length; i++)
+                    TaggedToken[] taggedSent = new TaggedToken[devSent.Length];
+                    for (int i = 0; i < devSent.Length; i++)
                     {
                         taggedSent[i] = new TaggedToken(devSent[i]);
                     }
@@ -341,12 +345,12 @@
         private void posUpdateWeights(
         TaggedToken[] taggedSent, TaggedToken[] trainSent)
         {
-            assert(taggedSent.length == trainSent.length);
+            assert(taggedSent.Length == trainSent.Length);
             History[] taggedHistory = sentToHistory(taggedSent);
             History[] trainHistory = sentToHistory(trainSent);
             int[] feats = new int[maxFeats];
             double[] values = new double[maxFeats];
-            for (int i = 0; i < taggedSent.length; i++)
+            for (int i = 0; i < taggedSent.Length; i++)
             {
                 int nFeats;
                 History tagged = taggedHistory[i];
@@ -380,8 +384,8 @@
          */
         public History[] sentToHistory(TaggedToken[] sent)
         {
-            History[] history = new History[sent.length];
-            for (int i = 0; i < sent.length; i++)
+            History[] history = new History[sent.Length];
+            for (int i = 0; i < sent.Length; i++)
             {
                 TaggedToken tok = sent[i];
                 history[i] = new History(
@@ -401,22 +405,22 @@
          * @return              tagged version of input sentence
          */
         public TaggedToken[] tagSentence(
-        TaggedToken[] sentence, boolean average, boolean preserve)
+        TaggedToken[] sentence, bool average, bool preserve)
         {
-            TaggedToken[] taggedSentence = new TaggedToken[sentence.length];
-            for (int i = 0; i < sentence.length; i++)
+            TaggedToken[] taggedSentence = new TaggedToken[sentence.Length];
+            for (int i = 0; i < sentence.Length; i++)
             {
                 taggedSentence[i] = new TaggedToken(sentence[i]);
                 taggedSentence[i].PosTag = -1;
             }
             if (hasPos) tagPos(taggedSentence, average);
-            for (int i = 0; i < sentence.length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
                 if (preserve && sentence[i].PosTag >= 0)
                     taggedSentence[i].PosTag = sentence[i].PosTag;
             }
             if (hasNE) tagNE(taggedSentence, average);
-            for (int i = 0; i < sentence.length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
                 if (preserve && sentence[i].NeTag >= 0)
                 {
@@ -431,7 +435,7 @@
             return taggedSentence;
         }
 
-        protected void tagPos(TaggedToken[] sentence, boolean average)
+        protected void tagPos(TaggedToken[] sentence, bool average)
         {
             History[] beam = new History[posBeamSize];
             History[] nextBeam = new History[posBeamSize];
@@ -439,20 +443,20 @@
             double[] values = new double[maxFeats];
             beam[0] = null;
             int beamUsed = 1, nextBeamUsed;
-            for (int i = 0; i < sentence.length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
                 TaggedToken ttok = sentence[i];
-                String text = ttok.Token.value;
-                String textLower = ttok.LowerCaseText;
+                string text = ttok.Token.value;
+                string textLower = ttok.LowerCaseText;
                 nextBeamUsed = 0;
                 int[] possibleTags = possiblePosTags(sentence, i);
                 int neTag = sentence[i].NeTag;
                 int neTypeTag = sentence[i].NeTypeTag;
-                assert possibleTags.length > 0;
+                assert possibleTags.Length > 0;
                 /*
                 if(!trainingMode) {
                 System.out.print(textLower + "   ");
-                for(int l=0; l<possibleTags.length; l++)
+                for(int l=0; l<possibleTags.Length; l++)
                     System.out.print(" " + possibleTags[l]);
                 System.out.println("");
                 }
@@ -543,16 +547,16 @@
             */
             // Copy the annotation of the best history to the sentence.
             History history = beam[0];
-            for (int i = 0; i < sentence.length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
-                sentence[sentence.length - (i + 1)].PosTag = history.posTag;
+                sentence[sentence.Length - (i + 1)].PosTag = history.posTag;
                 history = history.last;
             }
             assert(history == null);
         }
 
         // May be implemented by a subclass
-        protected void guessTags(String wordForm, boolean firstWord)
+        protected void guessTags(string wordForm, bool firstWord)
         {
             return;
         }
@@ -565,16 +569,16 @@
          */
         protected int[] possiblePosTags(TaggedToken[] sent, int idx)
         {
-            String textLower = sent[idx].LowerCaseText;
+            string textLower = sent[idx].LowerCaseText;
             if (!trainingMode)
                 guessTags(sent[idx].Token.value, (idx == 0));
 
             Lexicon.Entry[] entries = posLexicon.getEntries(textLower);
             if (entries == null)
             {
-                return tokTypeTags[sent[idx].Token.type];
+                return tokenTypeTags[sent[idx].Token.type];
             }
-            int[] tags = new int[entries.length];
+            int[] tags = new int[entries.Length];
             int nTags = 0;
             int nSeen = 0;
             int lastTag = -1;
@@ -601,15 +605,15 @@
             // mode), return the lexicon tags directly.
             if (!trainingMode || nSeen >= countLimit)
             {
-                if (nTags != tags.length) return Arrays.copyOf(tags, nTags);
+                if (nTags != tags.Length) return Arrays.copyOf(tags, nTags);
                 else return tags;
             }
             // Otherwise, merge the lexicon tags with the array of open tags
-            int[] possibleTags = tokTypeTags[sent[idx].Token.type];
+            int[] possibleTags = tokenTypeTags[sent[idx].Token.type];
             int[] lexiconTags = tags;
             int i = 0, j = 0, k = 0;
-            tags = new int[nTags + possibleTags.length];
-            for (; j < possibleTags.length && k < nTags; i++)
+            tags = new int[nTags + possibleTags.Length];
+            for (; j < possibleTags.Length && k < nTags; i++)
             {
                 if (possibleTags[j] < lexiconTags[k])
                 {
@@ -624,9 +628,9 @@
                     tags[i] = lexiconTags[k++];
                 }
             }
-            if (j < possibleTags.length)
+            if (j < possibleTags.Length)
             {
-                for (; j < possibleTags.length; j++) tags[i++] = possibleTags[j];
+                for (; j < possibleTags.Length; j++) tags[i++] = possibleTags[j];
             }
             else
             {
@@ -635,7 +639,7 @@
             nTags = i;
             for (int t = 0; t < nTags - 1; t++)
                 assert(tags[t] < tags[t + 1]);
-            if (nTags != tags.length) return Arrays.copyOf(tags, nTags);
+            if (nTags != tags.Length) return Arrays.copyOf(tags, nTags);
             else return tags;
         }
 
@@ -644,12 +648,12 @@
         {
             nePerceptron.StartTraining();
 
-            // Create a list of integers 0 to trainSents.length-1 (inclusive),
+            // Create a list of ints 0 to trainSents.Length-1 (inclusive),
             // which will be the order than sentences are processed during a
             // training iteration. This may be permuted at each iteration.
-            ArrayList<Integer> trainOrder =
-                new ArrayList<Integer>(trainSents.length);
-            for (int i = 0; i < trainSents.length; i++) trainOrder.add(new Integer(i));
+            List<int> trainOrder =
+                new List<int>(trainSents.Length);
+            for (int i = 0; i < trainSents.Length; i++) trainOrder.Add(new int(i));
 
             // The peak accuracy on the development set.
             int bestIter = 0;
@@ -667,10 +671,10 @@
                 {
                     TaggedToken[] trainSent = trainSents[sentIdx];
                     // If this sentence does not contain NE tags, skip it.
-                    if (trainSent.length == 0 || trainSent[0].NeTag < 0)
+                    if (trainSent.Length == 0 || trainSent[0].NeTag < 0)
                         continue;
-                    TaggedToken[] taggedSent = new TaggedToken[trainSent.length];
-                    for (int i = 0; i < trainSent.length; i++)
+                    TaggedToken[] taggedSent = new TaggedToken[trainSent.Length];
+                    for (int i = 0; i < trainSent.Length; i++)
                         taggedSent[i] = new TaggedToken(trainSent[i]);
                     tagNE(taggedSent, false);
                     trainEvaluation.evaluate(taggedSent, trainSent);
@@ -681,7 +685,7 @@
                         neUpdateWeights(taggedSent, trainSent);
                     }
                     // Check if it is time to accumulate perceptron weights.
-                    tokenCount += trainSent.length;
+                    tokenCount += trainSent.Length;
                     if (tokenCount > accumulateLimit)
                     {
                         nePerceptron.AccumulateWeights();
@@ -698,11 +702,11 @@
                 }
 
                 Evaluation devEvaluation = new Evaluation();
-                for (int sentIdx = 0; sentIdx < devSents.length; sentIdx++)
+                for (int sentIdx = 0; sentIdx < devSents.Length; sentIdx++)
                 {
                     TaggedToken[] devSent = devSents[sentIdx];
-                    TaggedToken[] taggedSent = new TaggedToken[devSent.length];
-                    for (int i = 0; i < devSent.length; i++)
+                    TaggedToken[] taggedSent = new TaggedToken[devSent.Length];
+                    for (int i = 0; i < devSent.Length; i++)
                     {
                         taggedSent[i] = new TaggedToken(devSent[i]);
                     }
@@ -737,12 +741,12 @@
         private void neUpdateWeights(
         TaggedToken[] taggedSent, TaggedToken[] trainSent)
         {
-            assert(taggedSent.length == trainSent.length);
+            assert(taggedSent.Length == trainSent.Length);
             History[] taggedHistory = sentToHistory(taggedSent);
             History[] trainHistory = sentToHistory(trainSent);
             int[] feats = new int[maxFeats];
             double[] values = new double[maxFeats];
-            for (int i = 0; i < taggedSent.length; i++)
+            for (int i = 0; i < taggedSent.Length; i++)
             {
                 int nFeats;
                 History tagged = taggedHistory[i];
@@ -762,7 +766,7 @@
             }
         }
 
-        void tagNE(TaggedToken[] sentence, boolean average)
+        void tagNE(TaggedToken[] sentence, bool average)
         {
             History[] beam = new History[neBeamSize];
             History[] nextBeam = new History[neBeamSize];
@@ -770,11 +774,11 @@
             double[] values = new double[maxFeats];
             beam[0] = null;
             int beamUsed = 1, nextBeamUsed;
-            for (int i = 0; i < sentence.length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
                 TaggedToken ttok = sentence[i];
-                String text = ttok.Token.value;
-                String textLower = ttok.LowerCaseText;
+                string text = ttok.Token.value;
+                string textLower = ttok.LowerCaseText;
                 nextBeamUsed = 0;
                 int posTag = sentence[i].PosTag;
                 for (int neTag = 0; neTag < TaggedData.NeTags; neTag++)
@@ -874,10 +878,10 @@
             */
             // Copy the annotation of the best history to the sentence.
             History history = beam[0];
-            for (int i = 0; i < sentence.length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
-                sentence[sentence.length - (i + 1)].NeTag = history.neTag;
-                sentence[sentence.length - (i + 1)].NeTypeTag = history.neTypeTag;
+                sentence[sentence.Length - (i + 1)].NeTag = history.neTag;
+                sentence[sentence.Length - (i + 1)].NeTypeTag = history.neTypeTag;
                 history = history.last;
             }
             assert(history == null);
@@ -888,30 +892,30 @@
          */
         protected int getPosFeats(
         TaggedToken[] sentence, int idx, int[] feats, double[] values, int nFeats,
-        int posTag, int neTag, int neTypeTag, boolean hasLast, History last,
-        boolean extend)
+        int posTag, int neTag, int neTypeTag, bool hasLast, History last,
+        bool extend)
         {
             char[] head = new char[8];
             int f;
             TaggedToken ttok = sentence[idx];
             char isInitial = (idx == 0) ? (char)1 : (char)0;
-            char isFinal = (idx == sentence.length - 1) ? (char)1 : (char)0;
+            char isFinal = (idx == sentence.Length - 1) ? (char)1 : (char)0;
             char capitalization = ttok.Token.isCapitalized() ? (char)1 : (char)0;
             char tokType = (char)ttok.Token.type;
-            char tokType1a = (idx == sentence.length - 1) ? 0xffff :
+            char tokType1a = (idx == sentence.Length - 1) ? 0xffff :
                              (char)sentence[idx + 1].Token.type;
-            String text = ttok.Token.value;
-            String textLower = ttok.LowerCaseText;
-            String nextText =
-                (idx == sentence.length - 1) ? "" : sentence[idx + 1].Token.value;
-            String nextText2 =
-                (idx >= sentence.length - 2) ? "" : sentence[idx + 2].Token.value;
-            String lastLower = (idx == 0) ? "" : sentence[idx - 1].LowerCaseText;
-            String lastLower2 = (idx < 2) ? "" : sentence[idx - 2].LowerCaseText;
-            String nextLower =
-                (idx == sentence.length - 1) ? "" : sentence[idx + 1].LowerCaseText;
-            String nextLower2 =
-                (idx >= sentence.length - 2) ? "" : sentence[idx + 2].LowerCaseText;
+            string text = ttok.Token.value;
+            string textLower = ttok.LowerCaseText;
+            string nextText =
+                (idx == sentence.Length - 1) ? "" : sentence[idx + 1].Token.value;
+            string nextText2 =
+                (idx >= sentence.Length - 2) ? "" : sentence[idx + 2].Token.value;
+            string lastLower = (idx == 0) ? "" : sentence[idx - 1].LowerCaseText;
+            string lastLower2 = (idx < 2) ? "" : sentence[idx - 2].LowerCaseText;
+            string nextLower =
+                (idx == sentence.Length - 1) ? "" : sentence[idx + 1].LowerCaseText;
+            string nextLower2 =
+                (idx >= sentence.Length - 2) ? "" : sentence[idx + 2].LowerCaseText;
 
             if (!hasLast)
             {
@@ -920,7 +924,7 @@
                 head[1] = (char)posTag;
                 head[2] = isFinal;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 3) + textLower, extend);
+                    new string(head, 0, 3) + textLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + textLower + capitalization + initial?
@@ -929,41 +933,41 @@
                 head[2] = capitalization;
                 head[3] = isInitial;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 4) + textLower, extend);
+                    new string(head, 0, 4) + textLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + textLower + lastLower
                 head[0] = 0x02;
                 head[1] = (char)posTag;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 2) + lastLower + "\n" + textLower, extend);
+                    new string(head, 0, 2) + lastLower + "\n" + textLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + textLower + nextLower
                 head[0] = 0x03;
                 head[1] = (char)posTag;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 2) + textLower + "\n" + nextLower, extend);
+                    new string(head, 0, 2) + textLower + "\n" + nextLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + textLower + nextLower + nextLower2
                 head[0] = 0x04;
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(new String(head, 0, 2) +
+                f = posPerceptron.getFeatureID(new string(head, 0, 2) +
                     textLower + "\n" + nextLower + "\n" + nextLower2, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + lastLower + textLower + nextLower
                 head[0] = 0x05;
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(new String(head, 0, 2) +
+                f = posPerceptron.getFeatureID(new string(head, 0, 2) +
                     lastLower + "\n" + textLower + "\n" + nextLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + lastLower2 + lastLower + textLower
                 head[0] = 0x06;
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(new String(head, 0, 2) +
+                f = posPerceptron.getFeatureID(new string(head, 0, 2) +
                     lastLower2 + "\n" + lastLower + "\n" + textLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
@@ -971,28 +975,28 @@
                 head[0] = 0x07;
                 head[1] = (char)posTag;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 2) + lastLower, extend);
+                    new string(head, 0, 2) + lastLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + lastLower2
                 head[0] = 0x08;
                 head[1] = (char)posTag;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 2) + lastLower2, extend);
+                    new string(head, 0, 2) + lastLower2, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + nextLower
                 head[0] = 0x09;
                 head[1] = (char)posTag;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 2) + nextLower, extend);
+                    new string(head, 0, 2) + nextLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + nextLower2
                 head[0] = 0x0a;
                 head[1] = (char)posTag;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 2) + nextLower2, extend);
+                    new string(head, 0, 2) + nextLower2, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + prefixes + capitalization + initial?
@@ -1000,13 +1004,13 @@
                 head[1] = (char)posTag;
                 head[2] = capitalization;
                 head[3] = isInitial;
-                for (int i = 1; i <= 4 && i < textLower.length(); i++)
+                for (int i = 1; i <= 4 && i < textLower.Length(); i++)
                 {
-                    String prefix = textLower.substring(0, i);
+                    string prefix = textLower.substring(0, i);
                     if (allowedPrefixes == null ||
                        allowedPrefixes.contains(prefix))
                     {
-                        f = posPerceptron.getFeatureID(new String(head, 0, 4) +
+                        f = posPerceptron.getFeatureID(new string(head, 0, 4) +
                             prefix, extend);
                         if (f >= 0)
                         {
@@ -1020,14 +1024,14 @@
                 head[1] = (char)posTag;
                 head[2] = capitalization;
                 head[3] = isInitial;
-                for (int i = textLower.length() - 5; i < textLower.length(); i++)
+                for (int i = textLower.Length() - 5; i < textLower.Length(); i++)
                 {
                     if (i < 2) continue;
-                    String suffix = textLower.substring(i);
+                    string suffix = textLower.substring(i);
                     if (allowedSuffixes == null ||
                        allowedSuffixes.contains(suffix))
                     {
-                        f = posPerceptron.getFeatureID(new String(head, 0, 4) +
+                        f = posPerceptron.getFeatureID(new string(head, 0, 4) +
                             suffix, extend);
                         if (f >= 0)
                         {
@@ -1042,15 +1046,15 @@
                 for (int i = 0; i < posDictionaries.size(); i++)
                 {
                     Dictionary dict = posDictionaries.get(i);
-                    String value = dict.map.get(text);
-                    String nextValue =
-                        (i == sentence.length - 1) ? "" :
+                    string value = dict.map.get(text);
+                    string nextValue =
+                        (i == sentence.Length - 1) ? "" :
                         dict.map.get(nextText);
-                    String nextValue2 =
-                        (i >= sentence.length - 2) ? "" :
+                    string nextValue2 =
+                        (i >= sentence.Length - 2) ? "" :
                         dict.map.get(nextText2);
                     head[2] = (char)i;
-                    String[] combinations = {
+                    string[] combinations = {
                     value,
                     (value == null || nextValue == null)? null :
                         value + "\n" + nextValue,
@@ -1059,12 +1063,12 @@
                         nextValue + "\n" + nextValue2,
                     nextValue2
                 };
-                    for (int j = 0; j < combinations.length; j++)
+                    for (int j = 0; j < combinations.Length; j++)
                     {
                         if (combinations[j] == null) continue;
                         head[3] = (char)j;
                         f = posPerceptron.getFeatureID(
-                            new String(head, 0, 4) + combinations[j], extend);
+                            new string(head, 0, 4) + combinations[j], extend);
                         if (f >= 0)
                         {
                             feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
@@ -1080,11 +1084,11 @@
                     float[] value = posEmbeddings.get(i).map.get(textLower);
                     if (value == null) continue;
                     head[2] = (char)i;
-                    for (int j = 0; j < value.length; j++)
+                    for (int j = 0; j < value.Length; j++)
                     {
                         head[3] = (char)j;
                         f = posPerceptron.getFeatureID(
-                            new String(head, 0, 4), extend);
+                            new string(head, 0, 4), extend);
                         if (f >= 0)
                         {
                             feats[nFeats] = f; values[nFeats] = value[j]; nFeats++;
@@ -1097,7 +1101,7 @@
                 head[1] = (char)posTag;
                 head[2] = tokType;
                 head[3] = (char)(textLower.contains("-") ? 1 : 0);
-                f = posPerceptron.getFeatureID(new String(head, 0, 4), extend);
+                f = posPerceptron.getFeatureID(new string(head, 0, 4), extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // POS + (current, next) token type
@@ -1105,7 +1109,7 @@
                 head[1] = (char)posTag;
                 head[2] = tokType;
                 head[3] = tokType1a;
-                f = posPerceptron.getFeatureID(new String(head, 0, 4), extend);
+                f = posPerceptron.getFeatureID(new string(head, 0, 4), extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
             }
             else
@@ -1122,7 +1126,7 @@
                 head[0] = 0x80;
                 head[1] = (char)posTag;
                 head[2] = posTag1b;
-                f = posPerceptron.getFeatureID(new String(head, 0, 3), extend);
+                f = posPerceptron.getFeatureID(new string(head, 0, 3), extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // (previous2, previous, current) POS
@@ -1130,7 +1134,7 @@
                 head[1] = (char)posTag;
                 head[2] = posTag1b;
                 head[3] = posTag2b;
-                f = posPerceptron.getFeatureID(new String(head, 0, 4), extend);
+                f = posPerceptron.getFeatureID(new string(head, 0, 4), extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // (previous, current) POS + textLower
@@ -1138,7 +1142,7 @@
                 head[1] = (char)posTag;
                 head[2] = posTag1b;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 3) + textLower, extend);
+                    new string(head, 0, 3) + textLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // (previous, current) POS + textLower + nextLower
@@ -1146,7 +1150,7 @@
                 head[1] = (char)posTag;
                 head[2] = posTag1b;
                 f = posPerceptron.getFeatureID(
-                    new String(head, 0, 3) + textLower + "\n" + nextLower, extend);
+                    new string(head, 0, 3) + textLower + "\n" + nextLower, extend);
                 if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
                 // (previous, current) POS + dictionary
@@ -1156,13 +1160,13 @@
                 for (int i = 0; i < posDictionaries.size(); i++)
                 {
                     Dictionary dict = posDictionaries.get(i);
-                    String nextValue =
-                        (i == sentence.length - 1) ? null :
+                    string nextValue =
+                        (i == sentence.Length - 1) ? null :
                         dict.map.get(nextText);
                     if (nextValue == null) continue;
                     head[3] = (char)i;
                     f = posPerceptron.getFeatureID(
-                        new String(head, 0, 4) + nextValue, extend);
+                        new string(head, 0, 4) + nextValue, extend);
                     if (f >= 0)
                     {
                         feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
@@ -1178,27 +1182,27 @@
          */
         protected int getNEFeats(
         TaggedToken[] sentence, int idx, int[] feats, double[] values, int nFeats,
-        int posTag, int neTag, int neTypeTag, History last, boolean extend)
+        int posTag, int neTag, int neTypeTag, History last, bool extend)
         {
             char[] head = new char[8];
             int f;
             char isInitial = (idx == 0) ? (char)1 : (char)0;
-            char isFinal = (idx == sentence.length - 1) ? (char)1 : (char)0;
+            char isFinal = (idx == sentence.Length - 1) ? (char)1 : (char)0;
             TaggedToken ttok = sentence[idx];
             char tokType = (char)ttok.Token.type;
             char capitalization = ttok.Token.isCapitalized() ? (char)1 : (char)0;
             int posTag1b = (idx == 0) ? 0xffff : sentence[idx - 1].PosTag;
             int posTag2b = (idx < 2) ? 0xffff : sentence[idx - 2].PosTag;
             int posTag1a =
-                (idx == sentence.length - 1) ? 0xffff : sentence[idx + 1].PosTag;
-            String text = ttok.Token.value;
-            String textLower = ttok.LowerCaseText;
-            String lastLower = (idx == 0) ? "" : sentence[idx - 1].LowerCaseText;
-            String lastLower2 = (idx < 2) ? "" : sentence[idx - 2].LowerCaseText;
-            String nextLower =
-                (idx == sentence.length - 1) ? "" : sentence[idx + 1].LowerCaseText;
-            String nextLower2 =
-                (idx >= sentence.length - 2) ? "" : sentence[idx + 2].LowerCaseText;
+                (idx == sentence.Length - 1) ? 0xffff : sentence[idx + 1].PosTag;
+            string text = ttok.Token.value;
+            string textLower = ttok.LowerCaseText;
+            string lastLower = (idx == 0) ? "" : sentence[idx - 1].LowerCaseText;
+            string lastLower2 = (idx < 2) ? "" : sentence[idx - 2].LowerCaseText;
+            string nextLower =
+                (idx == sentence.Length - 1) ? "" : sentence[idx + 1].LowerCaseText;
+            string nextLower2 =
+                (idx >= sentence.Length - 2) ? "" : sentence[idx + 2].LowerCaseText;
 
             // tag + type + POS
             head[0] = 0x00;
@@ -1206,7 +1210,7 @@
             head[2] = (char)neTypeTag;
             head[3] = (char)posTag;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 4), extend);
+                new string(head, 0, 4), extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // tag + type + (previous, current) POS
@@ -1216,7 +1220,7 @@
             head[3] = (char)posTag;
             head[4] = (char)posTag1b;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 5), extend);
+                new string(head, 0, 5), extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // tag + type + (current, next) POS
@@ -1226,7 +1230,7 @@
             head[3] = (char)posTag;
             head[4] = (char)posTag1a;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 5), extend);
+                new string(head, 0, 5), extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // tag + type + textLower
@@ -1234,7 +1238,7 @@
             head[1] = (char)neTag;
             head[2] = (char)neTypeTag;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 3) + textLower, extend);
+                new string(head, 0, 3) + textLower, extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // tag + type + textLower + nextLower
@@ -1242,7 +1246,7 @@
             head[1] = (char)neTag;
             head[2] = (char)neTypeTag;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 3) + textLower + "\n" + nextLower, extend);
+                new string(head, 0, 3) + textLower + "\n" + nextLower, extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // tag + type + lastLower + textLower
@@ -1250,7 +1254,7 @@
             head[1] = (char)neTag;
             head[2] = (char)neTypeTag;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 3) + lastLower + "\n" + textLower, extend);
+                new string(head, 0, 3) + lastLower + "\n" + textLower, extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // dictionaries
@@ -1260,13 +1264,13 @@
             for (int i = 0; i < neDictionaries.size(); i++)
             {
                 Dictionary dict = neDictionaries.get(i);
-                String value = dict.map.get(textLower);
-                String lastValue = (i == 0) ? "" : dict.map.get(lastLower);
-                String nextValue =
-                    (i == sentence.length - 1) ? "" :
+                string value = dict.map.get(textLower);
+                string lastValue = (i == 0) ? "" : dict.map.get(lastLower);
+                string nextValue =
+                    (i == sentence.Length - 1) ? "" :
                     dict.map.get(nextLower);
                 head[3] = (char)i;
-                String[] combinations = {
+                string[] combinations = {
                 value,
                 (value == null || lastValue == null)? null :
                     lastValue + "\n" + value,
@@ -1274,12 +1278,12 @@
                     value + "\n" + nextValue,
                 nextValue
             };
-                for (int j = 0; j < combinations.length; j++)
+                for (int j = 0; j < combinations.Length; j++)
                 {
                     if (combinations[j] == null) continue;
                     head[4] = (char)j;
                     f = nePerceptron.getFeatureID(
-                        new String(head, 0, 5) + combinations[j], extend);
+                        new string(head, 0, 5) + combinations[j], extend);
                     if (f >= 0)
                     {
                         feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
@@ -1296,11 +1300,11 @@
                 float[] value = neEmbeddings.get(i).map.get(textLower);
                 if (value == null) continue;
                 head[3] = (char)i;
-                for (int j = 0; j < value.length; j++)
+                for (int j = 0; j < value.Length; j++)
                 {
                     head[4] = (char)j;
                     f = nePerceptron.getFeatureID(
-                        new String(head, 0, 5), extend);
+                        new string(head, 0, 5), extend);
                     if (f >= 0)
                     {
                         feats[nFeats] = f; values[nFeats] = value[j]; nFeats++;
@@ -1314,7 +1318,7 @@
             head[2] = (char)neTypeTag;
             head[3] = tokType;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 4), extend);
+                new string(head, 0, 4), extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             char neTag1b = 0xffff;
@@ -1331,7 +1335,7 @@
             head[2] = (char)neTag1b;
             head[3] = (char)neTypeTag;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 4), extend);
+                new string(head, 0, 4), extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             // (previous, current) tag + type
@@ -1341,7 +1345,7 @@
             head[3] = (char)neTag2b;
             head[4] = (char)neTypeTag;
             f = nePerceptron.getFeatureID(
-                new String(head, 0, 5), extend);
+                new string(head, 0, 5), extend);
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             return nFeats;
@@ -1359,7 +1363,7 @@
             public final History last;
 
         public History(
-        String text, String textLower, String lf, int posTag, int neTag,
+        string text, string textLower, string lf, int posTag, int neTag,
         int neTypeTag, double score, History last)
             {
                 this.text = text;
