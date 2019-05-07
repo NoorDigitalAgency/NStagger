@@ -31,13 +31,13 @@ namespace Stagger
         // Array of POS tags that unknown words can have.
         protected int[] openTags;
         // Whether or not this tagger performs the given task.
-        protected bool hasPos, hasNE;
+        protected bool hasPos, hasNe;
         // Should known words be extended?
         protected bool extendLexicon = true;
 
         // Maximum number of training iterations.
-        protected int maxPosIters = 16;
-        protected int maxNEIters = 16;
+        protected int maximumPosIterations = 16;
+        protected int maximumNeIterations = 16;
         // Maximum number of features per decision, don't be cheap here.
         protected const int maxFeats = 0x80;
         // Interval (in tokens) at which to accumulate weight vector.
@@ -48,12 +48,12 @@ namespace Stagger
 
         protected void setMaxPosIters(int n)
         {
-            maxPosIters = n;
+            maximumPosIterations = n;
         }
 
         protected void setMaxNEIters(int n)
         {
-            maxNEIters = n;
+            maximumNeIterations = n;
         }
 
         public void setExtendLexicon(bool x)
@@ -63,7 +63,7 @@ namespace Stagger
 
         public void setHasNE(bool x)
         {
-            hasNE = x;
+            hasNe = x;
         }
 
         /**
@@ -75,7 +75,7 @@ namespace Stagger
         {
             trainingMode = false;
             hasPos = false;
-            hasNE = false;
+            hasNe = false;
             posPerceptron = null;
             nePerceptron = null;
             this.taggedData = taggedData;
@@ -197,79 +197,83 @@ namespace Stagger
             }
         }
 
-        /**
-         * Initializes the openTags list to contain all tags.
-         * TODO: consider using a tag-frequency heuristic to do this in a better
-         * way.
-         */
         protected void computeOpenTags()
         {
-            openTags = new int[taggedData.getPosTagSet().size()];
-            for (int i = 0; i < openTags.Length; i++) openTags[i] = i;
+            openTags = new int[taggedData.PosTagSet.Size];
+
+            for (int i = 0; i < openTags.Length; i++)
+            {
+                openTags[i] = i;
+            }
         }
 
-        /**
-         * Trains the tagger.
-         *
-         * @param trainSents    sentences used as training data
-         * @param devSents      sentences used to check the accuracy curve
-         */
-        public void train(
-        TaggedToken[][] trainSents, TaggedToken[][] devSents)
+        public void train(TaggedToken[][] trainSentences, TaggedToken[][] testSentences)
         {
             hasPos = false;
-            hasNE = false;
-            for (TaggedToken[] sent : trainSents)
+
+            hasNe = false;
+
+            foreach (TaggedToken[] sentence in trainSentences)
             {
-                for (TaggedToken tok : sent)
+                foreach (TaggedToken token in sentence)
                 {
-                    if (tok.posTag >= 0 && maxPosIters > 0) hasPos = true;
-                    if (tok.neTag >= 0 && maxNEIters > 0) hasNE = true;
+                    if (token.PosTag >= 0 && maximumPosIterations > 0)
+                    {
+                        hasPos = true;
+                    }
+
+                    if (token.NeTag >= 0 && maximumNeIterations > 0)
+                    {
+                        hasNe = true;
+                    }
                 }
             }
+
             trainingMode = true;
+
             if (hasPos)
             {
                 posPerceptron = new Perceptron();
-                trainPos(trainSents, devSents);
+
+                trainPos(trainSentences, testSentences);
             }
-            if (hasNE)
+
+            if (hasNe)
             {
                 nePerceptron = new Perceptron();
-                trainNE(trainSents, devSents);
+
+                trainNE(trainSentences, testSentences);
             }
+
             trainingMode = false;
         }
 
-        protected void trainPos(
-        TaggedToken[][] trainSents, TaggedToken[][] devSents)
+        protected void trainPos(TaggedToken[][] trainSentences, TaggedToken[][] testSentences)
         {
             posPerceptron.StartTraining();
 
-            // Create a list of ints 0 to trainSents.Length-1 (inclusive),
-            // which will be the order than sentences are processed during a
-            // training iteration. This may be permuted at each iteration.
-            List<int> trainOrder =
-                new List<int>(trainSents.Length);
-            for (int i = 0; i < trainSents.Length; i++) trainOrder.Add(new int(i));
+            List<int> trainOrder = new List<int>(trainSentences.Length);
 
-            // TODO: cache training set features+values
+            for (int i = 0; i < trainSentences.Length; i++)
+            {
+                trainOrder.Add(i);
+            }
 
-            // The peak accuracy on the development set.
-            int bestIter = 0;
+            int bestIterations = 0;
+
             double bestAccuracy = 0.0;
 
-            for (int iter = 0; iter < maxPosIters; iter++)
+            for (int iterations = 0; iterations < maximumPosIterations; iterations++)
             {
-                // Randomly reorder the sequence of training sentences.
-                // Collections.shuffle(trainOrder);
-                System.err.println("Starting POS iteration " + iter);
-                // Number of tokens since last weight accumulation.
-                int tokenCount = 0;
+                Console.WriteLine($"Starting POS iteration {iterations}");
+
+                int tokensCount = 0;
+
                 Evaluation trainEvaluation = new Evaluation();
+
                 for (int sentIdx : trainOrder)
                 {
-                    TaggedToken[] trainSent = trainSents[sentIdx];
+                    TaggedToken[] trainSent = trainSentences[sentIdx];
                     // If the sentence is not POS tagged, skip it
                     if (trainSent.Length == 0 || trainSent[0].PosTag < 0)
                         continue;
@@ -277,36 +281,36 @@ namespace Stagger
                     for (int i = 0; i < trainSent.Length; i++)
                         taggedSent[i] = new TaggedToken(trainSent[i]);
                     tagPos(taggedSent, false);
-                    int oldPosCorrect = trainEvaluation.posCorrect;
-                    trainEvaluation.evaluate(taggedSent, trainSent);
+                    int oldPosCorrect = trainEvaluation.PosCorrect;
+                    trainEvaluation.Evaluate(taggedSent, trainSent);
                     // Only perform weight updates if the sentence was incorrectly
                     // tagged
-                    if (trainEvaluation.posCorrect !=
+                    if (trainEvaluation.PosCorrect !=
                        oldPosCorrect + trainSent.Length)
                     {
                         posUpdateWeights(taggedSent, trainSent);
                     }
                     // Check if it is time to accumulate perceptron weights.
-                    tokenCount += trainSent.Length;
-                    if (tokenCount > accumulateLimit)
+                    tokensCount += trainSent.Length;
+                    if (tokensCount > accumulateLimit)
                     {
                         posPerceptron.AccumulateWeights();
-                        tokenCount = 0;
+                        tokensCount = 0;
                     }
                 }
                 System.err.println("Training set accuracy: " +
-                    trainEvaluation.posAccuracy());
+                    trainEvaluation.GetPosAccuracy());
 
-                if (devSents == null)
+                if (testSentences == null)
                 {
-                    if (iter == maxPosIters - 1) posPerceptron.MakeBestWeight();
+                    if (iterations == maximumPosIterations - 1) posPerceptron.MakeBestWeight();
                     continue;
                 }
 
                 Evaluation devEvaluation = new Evaluation();
-                for (int sentIdx = 0; sentIdx < devSents.Length; sentIdx++)
+                for (int sentIdx = 0; sentIdx < testSentences.Length; sentIdx++)
                 {
-                    TaggedToken[] devSent = devSents[sentIdx];
+                    TaggedToken[] devSent = testSentences[sentIdx];
                     TaggedToken[] taggedSent = new TaggedToken[devSent.Length];
                     for (int i = 0; i < devSent.Length; i++)
                     {
@@ -315,21 +319,21 @@ namespace Stagger
                     trainingMode = false;
                     tagPos(taggedSent, true);
                     trainingMode = true;
-                    devEvaluation.evaluate(taggedSent, devSent);
+                    devEvaluation.Evaluate(taggedSent, devSent);
                 }
-                double devAccuracy = devEvaluation.posAccuracy();
+                double devAccuracy = devEvaluation.GetPosAccuracy();
                 System.err.println("Development set accuracy: " + devAccuracy);
                 if ((devAccuracy - bestAccuracy) / devAccuracy > 0.00025)
                 {
                     bestAccuracy = devAccuracy;
-                    bestIter = iter;
+                    bestIterations = iterations;
                     posPerceptron.MakeBestWeight();
                 }
                 else if (devAccuracy > bestAccuracy)
                 {
                     posPerceptron.MakeBestWeight();
                 }
-                else if (bestIter <= iter - 3)
+                else if (bestIterations <= iterations - 3)
                 {
                     System.err.println("Accuracy not increasing, we are done.");
                     break;
@@ -357,21 +361,21 @@ namespace Stagger
                 History train = trainHistory[i];
                 // Compute feature values for negative example.
                 nFeats = getPosFeats(
-                    taggedSent, i, feats, values, 0, tagged.posTag,
-                    tagged.neTag, tagged.neTypeTag, false, null, true);
+                    taggedSent, i, feats, values, 0, tagged.PosTag,
+                    tagged.NeTag, tagged.NeTypeTag, false, null, true);
                 nFeats = getPosFeats(
-                    taggedSent, i, feats, values, nFeats, tagged.posTag,
-                    tagged.neTag, tagged.neTypeTag, true, tagged.last, true);
+                    taggedSent, i, feats, values, nFeats, tagged.PosTag,
+                    tagged.NeTag, tagged.NeTypeTag, true, tagged.Last, true);
                 posPerceptron.UpdateWeights(feats, values, nFeats, false);
 
                 // TODO: consider caching this
                 // Compute feature values for positive example.
                 nFeats = getPosFeats(
-                    trainSent, i, feats, values, 0, train.posTag,
-                    train.neTag, train.neTypeTag, false, null, true);
+                    trainSent, i, feats, values, 0, train.PosTag,
+                    train.NeTag, train.NeTypeTag, false, null, true);
                 nFeats = getPosFeats(
-                    trainSent, i, feats, values, nFeats, train.posTag,
-                    train.neTag, train.neTypeTag, true, train.last, true);
+                    trainSent, i, feats, values, nFeats, train.PosTag,
+                    train.NeTag, train.NeTypeTag, true, train.Last, true);
                 posPerceptron.UpdateWeights(feats, values, nFeats, true);
             }
         }
@@ -419,7 +423,7 @@ namespace Stagger
                 if (preserve && sentence[i].PosTag >= 0)
                     taggedSentence[i].PosTag = sentence[i].PosTag;
             }
-            if (hasNE) tagNE(taggedSentence, average);
+            if (hasNe) tagNE(taggedSentence, average);
             for (int i = 0; i < sentence.Length; i++)
             {
                 if (preserve && sentence[i].NeTag >= 0)
@@ -480,7 +484,7 @@ namespace Stagger
                         double score = posPerceptron.Score(
                             feats, values, nFeats, average);
                         // Compute the local + history score.
-                        if (history != null) score += history.score;
+                        if (history != null) score += history.Score;
                         /*
                         if(!trainingMode) {
                             for(int q=0; q<nFeats; q++)
@@ -501,7 +505,7 @@ namespace Stagger
                         {
                             // Otherwise, only add it if the score is higher than
                             // the lowest score currently in the beam.
-                            if (score > nextBeam[nextBeamUsed - 1].score)
+                            if (score > nextBeam[nextBeamUsed - 1].Score)
                             {
                                 int l = nextBeamUsed - 1;
                                 // If the beam has space left, make an extra copy
@@ -516,7 +520,7 @@ namespace Stagger
                                 // Move histories with lower scores than the
                                 // current one step to the right, until we find
                                 // the right place to insert the current history.
-                                while (l >= 0 && score > nextBeam[l].score)
+                                while (l >= 0 && score > nextBeam[l].Score)
                                 {
                                     nextBeam[l + 1] = nextBeam[l];
                                     l--;
@@ -549,8 +553,8 @@ namespace Stagger
             History history = beam[0];
             for (int i = 0; i < sentence.Length; i++)
             {
-                sentence[sentence.Length - (i + 1)].PosTag = history.posTag;
-                history = history.last;
+                sentence[sentence.Length - (i + 1)].PosTag = history.PosTag;
+                history = history.Last;
             }
             assert(history == null);
         }
@@ -659,7 +663,7 @@ namespace Stagger
             int bestIter = 0;
             double bestAccuracy = 0.0;
 
-            for (int iter = 0; iter < maxNEIters; iter++)
+            for (int iter = 0; iter < maximumNeIterations; iter++)
             {
                 // Randomly reorder the sequence of training sentences.
                 // Collections.shuffle(trainOrder);
@@ -677,10 +681,10 @@ namespace Stagger
                     for (int i = 0; i < trainSent.Length; i++)
                         taggedSent[i] = new TaggedToken(trainSent[i]);
                     tagNE(taggedSent, false);
-                    trainEvaluation.evaluate(taggedSent, trainSent);
+                    trainEvaluation.Evaluate(taggedSent, trainSent);
                     // Only perform weight updates if the sentence was incorrectly
                     // tagged
-                    if (!trainEvaluation.neEquals(taggedSent, trainSent))
+                    if (!trainEvaluation.AreNesEqual(taggedSent, trainSent))
                     {
                         neUpdateWeights(taggedSent, trainSent);
                     }
@@ -693,11 +697,11 @@ namespace Stagger
                     }
                 }
                 System.err.println("Training set F-score: " +
-                    trainEvaluation.neFscore());
+                    trainEvaluation.GetNeScore());
 
                 if (devSents == null)
                 {
-                    if (iter == maxNEIters - 1) nePerceptron.MakeBestWeight();
+                    if (iter == maximumNeIterations - 1) nePerceptron.MakeBestWeight();
                     continue;
                 }
 
@@ -713,9 +717,9 @@ namespace Stagger
                     trainingMode = false;
                     tagNE(taggedSent, true);
                     trainingMode = true;
-                    devEvaluation.evaluate(taggedSent, devSent);
+                    devEvaluation.Evaluate(taggedSent, devSent);
                 }
-                double devAccuracy = devEvaluation.neFscore();
+                double devAccuracy = devEvaluation.GetNeScore();
                 System.err.println("Development set F-score: " + devAccuracy);
                 if ((devAccuracy - bestAccuracy) / devAccuracy > 0.00025)
                 {
@@ -753,15 +757,15 @@ namespace Stagger
                 History train = trainHistory[i];
                 // Compute feature values for negative example.
                 nFeats = getNEFeats(
-                    taggedSent, i, feats, values, 0, tagged.posTag,
-                    tagged.neTag, tagged.neTypeTag, tagged.last, true);
+                    taggedSent, i, feats, values, 0, tagged.PosTag,
+                    tagged.NeTag, tagged.NeTypeTag, tagged.Last, true);
                 nePerceptron.UpdateWeights(feats, values, nFeats, false);
 
                 // TODO: consider caching this
                 // Compute feature values for positive example.
                 nFeats = getNEFeats(
-                    trainSent, i, feats, values, 0, train.posTag,
-                    train.neTag, train.neTypeTag, train.last, true);
+                    trainSent, i, feats, values, 0, train.PosTag,
+                    train.NeTag, train.NeTypeTag, train.Last, true);
                 nePerceptron.UpdateWeights(feats, values, nFeats, true);
             }
         }
@@ -791,14 +795,14 @@ namespace Stagger
                         History history = beam[j];
                         // O -> I transitions not allowed
                         if ((history == null ||
-                            history.neTag == TaggedData.NeO) &&
+                            history.NeTag == TaggedData.NeO) &&
                            neTag == TaggedData.NeI)
                             continue;
                         int minType = -1, maxType = -1;
                         if (neTag == TaggedData.NeI)
                         {
-                            minType = history.neTypeTag;
-                            maxType = history.neTypeTag;
+                            minType = history.NeTypeTag;
+                            maxType = history.NeTypeTag;
                         }
                         else if (neTag == TaggedData.NeB)
                         {
@@ -815,7 +819,7 @@ namespace Stagger
                             double score = nePerceptron.Score(
                                 feats, values, nFeats, average);
                             // Compute the local + history score.
-                            if (history != null) score += history.score;
+                            if (history != null) score += history.Score;
                             // If the beam is empty, always add this decision.
                             if (nextBeamUsed == 0)
                             {
@@ -829,7 +833,7 @@ namespace Stagger
                             {
                                 // Otherwise, only add it if the score is higher
                                 // than the lowest score currently in the beam.
-                                if (score > nextBeam[nextBeamUsed - 1].score)
+                                if (score > nextBeam[nextBeamUsed - 1].Score)
                                 {
                                     int l = nextBeamUsed - 1;
                                     // If the beam has space left, make an extra
@@ -846,7 +850,7 @@ namespace Stagger
                                     // current one step to the right, until we find
                                     // the right place to insert the current
                                     // history.
-                                    while (l >= 0 && score > nextBeam[l].score)
+                                    while (l >= 0 && score > nextBeam[l].Score)
                                     {
                                         nextBeam[l + 1] = nextBeam[l];
                                         l--;
@@ -880,9 +884,9 @@ namespace Stagger
             History history = beam[0];
             for (int i = 0; i < sentence.Length; i++)
             {
-                sentence[sentence.Length - (i + 1)].NeTag = history.neTag;
-                sentence[sentence.Length - (i + 1)].NeTypeTag = history.neTypeTag;
-                history = history.last;
+                sentence[sentence.Length - (i + 1)].NeTag = history.NeTag;
+                sentence[sentence.Length - (i + 1)].NeTypeTag = history.NeTypeTag;
+                history = history.Last;
             }
             assert(history == null);
         }
@@ -1118,8 +1122,8 @@ namespace Stagger
                 char posTag2b = 0xffff;
                 if (last != null)
                 {
-                    posTag1b = (char)last.posTag;
-                    if (last.last != null) posTag2b = (char)last.last.posTag;
+                    posTag1b = (char)last.PosTag;
+                    if (last.Last != null) posTag2b = (char)last.Last.PosTag;
                 }
 
                 // (previous, current) POS
@@ -1325,8 +1329,8 @@ namespace Stagger
             char neTag2b = 0xffff;
             if (last != null)
             {
-                neTag1b = (char)last.neTag;
-                if (last.last != null) neTag2b = (char)last.last.neTag;
+                neTag1b = (char)last.NeTag;
+                if (last.Last != null) neTag2b = (char)last.Last.NeTag;
             }
 
             // (previous, current) tag + type
@@ -1349,32 +1353,6 @@ namespace Stagger
             if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
             return nFeats;
-        }
-
-        protected static class History
-        {
-            public final String text;
-        public final String textLower;
-        public final String lf;
-        public final int posTag;
-            public final int neTag;
-            public final int neTypeTag;
-            public final double score;
-            public final History last;
-
-        public History(
-        string text, string textLower, string lf, int posTag, int neTag,
-        int neTypeTag, double score, History last)
-            {
-                this.text = text;
-                this.textLower = textLower;
-                this.lf = lf;
-                this.posTag = posTag;
-                this.neTag = neTag;
-                this.neTypeTag = neTypeTag;
-                this.score = score;
-                this.last = last;
-            }
         }
     }
 }
