@@ -17,7 +17,7 @@ namespace Stagger
 
         protected Perceptron NePerceptron;
 
-        protected TaggedData Data { get; }
+        protected TaggedData TaggedData { get; }
 
         protected int PosBeamSize;
 
@@ -65,7 +65,7 @@ namespace Stagger
 
             NePerceptron = null;
 
-            Data = taggedData;
+            TaggedData = taggedData;
 
             PosBeamSize = posBeamSize;
 
@@ -93,7 +93,7 @@ namespace Stagger
         {
             const int types = (int)TokenType.Types;
 
-            bool[,] hasTag = new bool[types, Data.PosTagSet.Size];
+            bool[,] hasTag = new bool[types, TaggedData.PosTagSet.Size];
 
             foreach (TaggedToken[] sentence in sentences)
             {
@@ -142,9 +142,9 @@ namespace Stagger
             }
         }
 
-        protected void ComputeOpenTags()
+        protected virtual void ComputeOpenTags()
         {
-            OpenTags = new int[Data.PosTagSet.Size];
+            OpenTags = new int[TaggedData.PosTagSet.Size];
 
             for (int i = 0; i < OpenTags.Length; i++)
             {
@@ -152,7 +152,7 @@ namespace Stagger
             }
         }
 
-        public void Train(TaggedToken[][] trainSentences, TaggedToken[][] developmentSentences)
+        public virtual void Train(TaggedToken[][] trainSentences, TaggedToken[][] developmentSentences)
         {
             HasPos = false;
 
@@ -804,7 +804,7 @@ namespace Stagger
                         {
                             minType = 0;
 
-                            maxType = Data.NeTypeTagSet.Size - 1;
+                            maxType = TaggedData.NeTypeTagSet.Size - 1;
                         }
 
                         for (int neTypeTag = minType; neTypeTag <= maxType; neTypeTag++)
@@ -878,7 +878,7 @@ namespace Stagger
             Debug.Assert(history == null);
         }
 
-        protected int GetPosFeatures(TaggedToken[] sentence, int index, int[] features, double[] values, int featuresCount, int posTag, int neTag, int neTypeTag, bool hasLast, History history, bool extend)
+        protected virtual int GetPosFeatures(TaggedToken[] sentence, int index, int[] features, double[] values, int featuresCount, int posTag, int neTag, int neTypeTag, bool hasLast, History history, bool extend)
         {
             char[] head = new char[8];
 
