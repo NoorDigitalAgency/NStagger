@@ -1,148 +1,99 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Stagger
 {
     public class Tagger
     {
-        // During training, words with fewer occurences than this in the training
-        // set are considered unknown. Empirically, 3 seems to be a good value.
-        protected const int countLimit = 3;
-        // If true, the countLimit value is used to create "unknown" words.
-        protected bool trainingMode;
-        // A list of POS tags each word form can take.
-        protected Lexicon posLexicon;
-        // Lists of possible POS tags for each token type
-        protected int[][] tokenTypeTags;
-        // Perceptrons for the two tasks: POS and NER.
-        protected Perceptron posPerceptron;
-        protected Perceptron nePerceptron;
-        // Reading the POS and NER tag formats.
-        protected TaggedData taggedData;
-        // Beam sizes for the tagging algorithms.
-        protected int posBeamSize;
-        protected int neBeamSize;
-        // Word representations for the two tasks.
-        protected List<Dictionary> posDictionaries;
-        protected List<Embedding> posEmbeddings;
-        protected List<Dictionary> neDictionaries;
-        protected List<Embedding> neEmbeddings;
-        // Array of POS tags that unknown words can have.
-        protected int[] openTags;
-        // Whether or not this tagger performs the given task.
-        protected bool hasPos, hasNe;
-        // Should known words be extended?
-        protected bool extendLexicon = true;
+        protected const int CountLimit = 3;
 
-        // Maximum number of training iterations.
-        protected int maximumPosIterations = 16;
-        protected int maximumNeIterations = 16;
-        // Maximum number of features per decision, don't be cheap here.
-        protected const int maxFeats = 0x80;
-        // Interval (in tokens) at which to accumulate weight vector.
-        protected const int accumulateLimit = 0x1000;
+        protected bool TrainingMode;
 
-        protected HashSet<string> allowedPrefixes = null;
-        protected HashSet<string> allowedSuffixes = null;
+        protected int[][] TokenTypeTags;
 
-        protected void setMaxPosIters(int n)
-        {
-            maximumPosIterations = n;
-        }
+        protected Perceptron PosPerceptron;
 
-        protected void setMaxNEIters(int n)
-        {
-            maximumNeIterations = n;
-        }
+        protected Perceptron NePerceptron;
 
-        public void setExtendLexicon(bool x)
-        {
-            extendLexicon = x;
-        }
+        protected TaggedData Data { get; }
 
-        public void setHasNE(bool x)
-        {
-            hasNe = x;
-        }
+        protected int PosBeamSize;
 
-        /**
-         * Creates a new tagger.
-         *
-         * train() will initialize the tagger further.
-         */
+        protected int NeBeamSize;
+
+        protected int[] OpenTags;
+
+        protected bool HasPos;
+
+        protected const int MaximumFeatures = 0x80;
+
+        protected const int AccumulateLimit = 0x1000;
+
+        protected HashSet<string> AllowedPrefixes = null;
+
+        protected HashSet<string> AllowedSuffixes = null;
+
+        protected bool HasNe { get; set; }
+
+        protected Lexicon PosLexicon { get; }
+
+        protected List<Dictionary> PosDictionaries { get; set; }
+
+        protected List<Embedding> PosEmbeddings { get; set; }
+
+        protected List<Dictionary> NeDictionaries { get; set; }
+
+        protected List<Embedding> NeEmbeddings { get; set; }
+
+        protected bool ExtendLexicon { get; set; } = true;
+
+        protected int MaximumPosIterations { get; set; } = 16;
+
+        protected int MaximumNeIterations { get; set; } = 16;
+
         public Tagger(TaggedData taggedData, int posBeamSize, int neBeamSize)
         {
-            trainingMode = false;
-            hasPos = false;
-            hasNe = false;
-            posPerceptron = null;
-            nePerceptron = null;
-            this.taggedData = taggedData;
-            this.posBeamSize = posBeamSize;
-            this.neBeamSize = neBeamSize;
-            posDictionaries = new List<Dictionary>();
-            posEmbeddings = new List<Embedding>();
-            neDictionaries = new List<Dictionary>();
-            neEmbeddings = new List<Embedding>();
-            posLexicon = new Lexicon();
-            computeOpenTags();
+            TrainingMode = false;
+
+            HasPos = false;
+
+            HasNe = false;
+
+            PosPerceptron = null;
+
+            NePerceptron = null;
+
+            Data = taggedData;
+
+            PosBeamSize = posBeamSize;
+
+            NeBeamSize = neBeamSize;
+
+            PosDictionaries = new List<Dictionary>();
+
+            PosEmbeddings = new List<Embedding>();
+
+            NeDictionaries = new List<Dictionary>();
+
+            NeEmbeddings = new List<Embedding>();
+
+            PosLexicon = new Lexicon();
+
+            ComputeOpenTags();
         }
 
-        public Lexicon getPosLexicon()
-        {
-            return posLexicon;
-        }
-
-        public void setPosDictionaries(List<Dictionary> dictionaries)
-        {
-            posDictionaries = dictionaries;
-        }
-
-        public void setNEDictionaries(List<Dictionary> dictionaries)
-        {
-            neDictionaries = dictionaries;
-        }
-
-        public void setPosEmbeddings(List<Embedding> embeddings)
-        {
-            posEmbeddings = embeddings;
-        }
-
-        public void setNEEmbeddings(List<Embedding> embeddings)
-        {
-            neEmbeddings = embeddings;
-        }
-
-        /**
-         * Returns the TaggedData instance used by this tagger.
-         *
-         * @return  TaggedData instance
-         */
-        public TaggedData getTaggedData()
-        {
-            return taggedData;
-        }
-
-        /**
-         * Annotates a token with its lemma form, given its POS tag.
-         *
-         * The default is to not use lemmas at all, but inflectional languages
-         * should override this method.
-         */
-        protected string getLemma(TaggedToken token)
+        protected virtual string GetLemma(TaggedToken token)
         {
             return null;
         }
 
-        /**
-         * Constructs POS tag lexicon, and generalized token lexicon.
-         */
-        public void buildLexicons(TaggedToken[][] sentences)
+        public void BuildLexicons(TaggedToken[][] sentences)
         {
             const int types = (int)TokenType.Types;
 
-            bool[,] hasTag = new bool[types, taggedData.PosTagSet.Size];
+            bool[,] hasTag = new bool[types, Data.PosTagSet.Size];
 
             foreach (TaggedToken[] sentence in sentences)
             {
@@ -152,105 +103,99 @@ namespace Stagger
                     {
                         hasTag[(int)token.Token.Type, token.PosTag] = true;
 
-                        posLexicon.AddEntry(token.Token.Value, token.Lemma, token.PosTag, 1);
+                        PosLexicon.AddEntry(token.Token.Value, token.Lemma, token.PosTag, 1);
                     }
                 }
             }
 
-            tokenTypeTags = new int[types][];
+            TokenTypeTags = new int[types][];
 
             for (int tokenType = 0; tokenType < types; tokenType++)
             {
-                int tagsCount = openTags.Count(openTag => hasTag[tokenType, openTag]);
+                int tagsCount = OpenTags.Count(openTag => hasTag[tokenType, openTag]);
 
                 if (tagsCount == 0)
                 {
-                    tokenTypeTags[tokenType] = openTags;
+                    TokenTypeTags[tokenType] = OpenTags;
                 }
                 else
                 {
-                    tokenTypeTags[tokenType] = new int[tagsCount];
+                    TokenTypeTags[tokenType] = new int[tagsCount];
 
                     int j = 0;
 
-                    foreach (int openTag in openTags)
+                    foreach (int openTag in OpenTags)
                     {
                         if (hasTag[tokenType, openTag])
                         {
-                            tokenTypeTags[tokenType][j++] = openTag;
+                            TokenTypeTags[tokenType][j++] = openTag;
                         }
                     }
 
-                    if (j != tagsCount)
-                    {
-                        throw new Exception("Incorrect number of Tags.");
-                    }
+                    Debug.Assert(j == tagsCount);
 
                     for (int k = 0; k < j - 1; k++)
                     {
-                        if (!(tokenTypeTags[tokenType][k] < tokenTypeTags[tokenType][k + 1]))
-                        {
-                            throw new Exception("Incorrect Tags order.");
-                        }
+                        Debug.Assert(TokenTypeTags[tokenType][k] < TokenTypeTags[tokenType][k + 1]);
                     }
                 }
             }
         }
 
-        protected void computeOpenTags()
+        protected void ComputeOpenTags()
         {
-            openTags = new int[taggedData.PosTagSet.Size];
+            OpenTags = new int[Data.PosTagSet.Size];
 
-            for (int i = 0; i < openTags.Length; i++)
+            for (int i = 0; i < OpenTags.Length; i++)
             {
-                openTags[i] = i;
+                OpenTags[i] = i;
             }
         }
 
-        public void train(TaggedToken[][] trainSentences, TaggedToken[][] testSentences)
+        public void Train(TaggedToken[][] trainSentences, TaggedToken[][] developmentSentences)
         {
-            hasPos = false;
+            HasPos = false;
 
-            hasNe = false;
+            HasNe = false;
 
             foreach (TaggedToken[] sentence in trainSentences)
             {
                 foreach (TaggedToken token in sentence)
                 {
-                    if (token.PosTag >= 0 && maximumPosIterations > 0)
+                    if (token.PosTag >= 0 && MaximumPosIterations > 0)
                     {
-                        hasPos = true;
+                        HasPos = true;
                     }
 
-                    if (token.NeTag >= 0 && maximumNeIterations > 0)
+                    if (token.NeTag >= 0 && MaximumNeIterations > 0)
                     {
-                        hasNe = true;
+                        HasNe = true;
                     }
                 }
             }
 
-            trainingMode = true;
+            TrainingMode = true;
 
-            if (hasPos)
+            if (HasPos)
             {
-                posPerceptron = new Perceptron();
+                PosPerceptron = new Perceptron();
 
-                trainPos(trainSentences, testSentences);
+                TrainPos(trainSentences, developmentSentences);
             }
 
-            if (hasNe)
+            if (HasNe)
             {
-                nePerceptron = new Perceptron();
+                NePerceptron = new Perceptron();
 
-                trainNE(trainSentences, testSentences);
+                TrainNe(trainSentences, developmentSentences);
             }
 
-            trainingMode = false;
+            TrainingMode = false;
         }
 
-        protected void trainPos(TaggedToken[][] trainSentences, TaggedToken[][] testSentences)
+        protected void TrainPos(TaggedToken[][] trainSentences, TaggedToken[][] developmentSentences)
         {
-            posPerceptron.StartTraining();
+            PosPerceptron.StartTraining();
 
             List<int> trainOrder = new List<int>(trainSentences.Length);
 
@@ -263,7 +208,7 @@ namespace Stagger
 
             double bestAccuracy = 0.0;
 
-            for (int iterations = 0; iterations < maximumPosIterations; iterations++)
+            for (int iterations = 0; iterations < MaximumPosIterations; iterations++)
             {
                 Console.WriteLine($"Starting POS iteration {iterations}");
 
@@ -271,353 +216,362 @@ namespace Stagger
 
                 Evaluation trainEvaluation = new Evaluation();
 
-                for (int sentIdx : trainOrder)
+                foreach (int sentenceIndex in trainOrder)
                 {
-                    TaggedToken[] trainSent = trainSentences[sentIdx];
-                    // If the sentence is not POS tagged, skip it
+                    TaggedToken[] trainSent = trainSentences[sentenceIndex];
+
                     if (trainSent.Length == 0 || trainSent[0].PosTag < 0)
+                    {
                         continue;
-                    TaggedToken[] taggedSent = new TaggedToken[trainSent.Length];
-                    for (int i = 0; i < trainSent.Length; i++)
-                        taggedSent[i] = new TaggedToken(trainSent[i]);
-                    tagPos(taggedSent, false);
-                    int oldPosCorrect = trainEvaluation.PosCorrect;
-                    trainEvaluation.Evaluate(taggedSent, trainSent);
-                    // Only perform weight updates if the sentence was incorrectly
-                    // tagged
-                    if (trainEvaluation.PosCorrect !=
-                       oldPosCorrect + trainSent.Length)
-                    {
-                        posUpdateWeights(taggedSent, trainSent);
                     }
-                    // Check if it is time to accumulate perceptron weights.
-                    tokensCount += trainSent.Length;
-                    if (tokensCount > accumulateLimit)
+
+                    TaggedToken[] taggedSent = new TaggedToken[trainSent.Length];
+
+                    for (int i = 0; i < trainSent.Length; i++)
                     {
-                        posPerceptron.AccumulateWeights();
+                        taggedSent[i] = new TaggedToken(trainSent[i]);
+                    }
+
+                    TagPos(taggedSent, false);
+
+                    int oldPosCorrect = trainEvaluation.PosCorrect;
+
+                    trainEvaluation.Evaluate(taggedSent, trainSent);
+
+                    if (trainEvaluation.PosCorrect != oldPosCorrect + trainSent.Length)
+                    {
+                        PosUpdateWeights(taggedSent, trainSent);
+                    }
+
+                    tokensCount += trainSent.Length;
+
+                    if (tokensCount > AccumulateLimit)
+                    {
+                        PosPerceptron.AccumulateWeights();
+
                         tokensCount = 0;
                     }
                 }
-                System.err.println("Training set accuracy: " +
-                    trainEvaluation.GetPosAccuracy());
 
-                if (testSentences == null)
+                Console.WriteLine($"Training set accuracy: {trainEvaluation.GetPosAccuracy()}");
+
+                if (developmentSentences == null)
                 {
-                    if (iterations == maximumPosIterations - 1) posPerceptron.MakeBestWeight();
+                    if (iterations == MaximumPosIterations - 1)
+                    {
+                        PosPerceptron.MakeBestWeight();
+                    }
+
                     continue;
                 }
 
-                Evaluation devEvaluation = new Evaluation();
-                for (int sentIdx = 0; sentIdx < testSentences.Length; sentIdx++)
+                Evaluation developmentEvaluation = new Evaluation();
+
+                foreach (TaggedToken[] developmentSentence in developmentSentences)
                 {
-                    TaggedToken[] devSent = testSentences[sentIdx];
-                    TaggedToken[] taggedSent = new TaggedToken[devSent.Length];
-                    for (int i = 0; i < devSent.Length; i++)
+                    TaggedToken[] taggedSentence = new TaggedToken[developmentSentence.Length];
+
+                    for (int i = 0; i < developmentSentence.Length; i++)
                     {
-                        taggedSent[i] = new TaggedToken(devSent[i]);
+                        taggedSentence[i] = new TaggedToken(developmentSentence[i]);
                     }
-                    trainingMode = false;
-                    tagPos(taggedSent, true);
-                    trainingMode = true;
-                    devEvaluation.Evaluate(taggedSent, devSent);
+
+                    TrainingMode = false;
+
+                    TagPos(taggedSentence, true);
+
+                    TrainingMode = true;
+
+                    developmentEvaluation.Evaluate(taggedSentence, developmentSentence);
                 }
-                double devAccuracy = devEvaluation.GetPosAccuracy();
-                System.err.println("Development set accuracy: " + devAccuracy);
-                if ((devAccuracy - bestAccuracy) / devAccuracy > 0.00025)
+
+                double developmentAccuracy = developmentEvaluation.GetPosAccuracy();
+
+                Console.WriteLine($"Development set accuracy: {developmentAccuracy}");
+
+                if ((developmentAccuracy - bestAccuracy) / developmentAccuracy > 0.00025)
                 {
-                    bestAccuracy = devAccuracy;
+                    bestAccuracy = developmentAccuracy;
+
                     bestIterations = iterations;
-                    posPerceptron.MakeBestWeight();
+
+                    PosPerceptron.MakeBestWeight();
                 }
-                else if (devAccuracy > bestAccuracy)
+                else if (developmentAccuracy > bestAccuracy)
                 {
-                    posPerceptron.MakeBestWeight();
+                    PosPerceptron.MakeBestWeight();
                 }
                 else if (bestIterations <= iterations - 3)
                 {
-                    System.err.println("Accuracy not increasing, we are done.");
+                    Console.WriteLine("Accuracy not increasing, we are done.");
+
                     break;
                 }
 
             }
-            posPerceptron.EndTraining();
+
+            PosPerceptron.EndTraining();
         }
 
-        /**
-         * Update the weights according to the target and model taggings.
-         */
-        private void posUpdateWeights(
-        TaggedToken[] taggedSent, TaggedToken[] trainSent)
+        private void PosUpdateWeights(TaggedToken[] taggedSentence, TaggedToken[] trainSentence)
         {
-            assert(taggedSent.Length == trainSent.Length);
-            History[] taggedHistory = sentToHistory(taggedSent);
-            History[] trainHistory = sentToHistory(trainSent);
-            int[] feats = new int[maxFeats];
-            double[] values = new double[maxFeats];
-            for (int i = 0; i < taggedSent.Length; i++)
+            Debug.Assert(taggedSentence.Length == trainSentence.Length);
+
+            History[] taggedHistory = SentenceToHistory(taggedSentence);
+
+            History[] trainHistory = SentenceToHistory(trainSentence);
+
+            int[] features = new int[MaximumFeatures];
+
+            double[] values = new double[MaximumFeatures];
+
+            for (int i = 0; i < taggedSentence.Length; i++)
             {
-                int nFeats;
                 History tagged = taggedHistory[i];
-                History train = trainHistory[i];
-                // Compute feature values for negative example.
-                nFeats = getPosFeats(
-                    taggedSent, i, feats, values, 0, tagged.PosTag,
-                    tagged.NeTag, tagged.NeTypeTag, false, null, true);
-                nFeats = getPosFeats(
-                    taggedSent, i, feats, values, nFeats, tagged.PosTag,
-                    tagged.NeTag, tagged.NeTypeTag, true, tagged.Last, true);
-                posPerceptron.UpdateWeights(feats, values, nFeats, false);
 
-                // TODO: consider caching this
-                // Compute feature values for positive example.
-                nFeats = getPosFeats(
-                    trainSent, i, feats, values, 0, train.PosTag,
-                    train.NeTag, train.NeTypeTag, false, null, true);
-                nFeats = getPosFeats(
-                    trainSent, i, feats, values, nFeats, train.PosTag,
-                    train.NeTag, train.NeTypeTag, true, train.Last, true);
-                posPerceptron.UpdateWeights(feats, values, nFeats, true);
+                History train = trainHistory[i];
+
+                int featuresCount = GetPosFeatures(taggedSentence, i, features, values, 0, tagged.PosTag, tagged.NeTag, tagged.NeTypeTag, false, null, true);
+
+                featuresCount = GetPosFeatures(taggedSentence, i, features, values, featuresCount, tagged.PosTag, tagged.NeTag, tagged.NeTypeTag, true, tagged.Last, true);
+
+                PosPerceptron.UpdateWeights(features, values, featuresCount, false);
+
+                featuresCount = GetPosFeatures(trainSentence, i, features, values, 0, train.PosTag, train.NeTag, train.NeTypeTag, false, null, true);
+
+                featuresCount = GetPosFeatures(trainSentence, i, features, values, featuresCount, train.PosTag, train.NeTag, train.NeTypeTag, true, train.Last, true);
+
+                PosPerceptron.UpdateWeights(features, values, featuresCount, true);
             }
         }
 
-        /**
-         * Creates a linked History vector from a sentence.
-         *
-         * @param sent      input sentence
-         * @return          History array representing the same contents
-         */
-        public History[] sentToHistory(TaggedToken[] sent)
+        public History[] SentenceToHistory(TaggedToken[] sentence)
         {
-            History[] history = new History[sent.Length];
-            for (int i = 0; i < sent.Length; i++)
+            History[] history = new History[sentence.Length];
+
+            for (int i = 0; i < sentence.Length; i++)
             {
-                TaggedToken tok = sent[i];
-                history[i] = new History(
-                    tok.Token.value, tok.LowerCaseText,
-                    tok.Lemma, tok.PosTag, tok.NeTag, tok.NeTypeTag, 0.0,
-                    (i == 0) ? null : history[i - 1]);
+                TaggedToken token = sentence[i];
+
+                history[i] = new History(token.Token.Value, token.LowerCaseText, token.Lemma, token.PosTag, token.NeTag, token.NeTypeTag, 0.0, (i == 0) ? null : history[i - 1]);
             }
+
             return history;
         }
 
-        /**
-         * Tag a sentence with POS and NE information.
-         *
-         * @param sentence      input sentence, will not be modified
-         * @param average       if true, use the averaged perceptron
-         * @param preserve      if true, do not overwrite tags
-         * @return              tagged version of input sentence
-         */
-        public TaggedToken[] tagSentence(
-        TaggedToken[] sentence, bool average, bool preserve)
+        public TaggedToken[] TagSentence(TaggedToken[] sentence, bool average, bool preserve)
         {
             TaggedToken[] taggedSentence = new TaggedToken[sentence.Length];
+
             for (int i = 0; i < sentence.Length; i++)
             {
-                taggedSentence[i] = new TaggedToken(sentence[i]);
-                taggedSentence[i].PosTag = -1;
+                taggedSentence[i] = new TaggedToken(sentence[i]) { PosTag = -1 };
             }
-            if (hasPos) tagPos(taggedSentence, average);
+
+            if (HasPos)
+            {
+                TagPos(taggedSentence, average);
+            }
+
             for (int i = 0; i < sentence.Length; i++)
             {
                 if (preserve && sentence[i].PosTag >= 0)
+                {
                     taggedSentence[i].PosTag = sentence[i].PosTag;
+                }
             }
-            if (hasNe) tagNE(taggedSentence, average);
+
+            if (HasNe)
+            {
+                TagNe(taggedSentence, average);
+            }
+
             for (int i = 0; i < sentence.Length; i++)
             {
                 if (preserve && sentence[i].NeTag >= 0)
                 {
                     taggedSentence[i].NeTag = sentence[i].NeTag;
+
                     taggedSentence[i].NeTypeTag = sentence[i].NeTypeTag;
                 }
+
                 if ((!preserve) || taggedSentence[i].Lemma == null)
                 {
-                    taggedSentence[i].Lemma = getLemma(taggedSentence[i]);
+                    taggedSentence[i].Lemma = GetLemma(taggedSentence[i]);
                 }
             }
+
             return taggedSentence;
         }
 
-        protected void tagPos(TaggedToken[] sentence, bool average)
+        protected void TagPos(TaggedToken[] sentence, bool average)
         {
-            History[] beam = new History[posBeamSize];
-            History[] nextBeam = new History[posBeamSize];
-            int[] feats = new int[maxFeats];
-            double[] values = new double[maxFeats];
+            History[] beam = new History[PosBeamSize];
+
+            History[] nextBeam = new History[PosBeamSize];
+
+            int[] features = new int[MaximumFeatures];
+
+            double[] values = new double[MaximumFeatures];
+
             beam[0] = null;
-            int beamUsed = 1, nextBeamUsed;
+
+            int beamUsed = 1;
+
             for (int i = 0; i < sentence.Length; i++)
             {
-                TaggedToken ttok = sentence[i];
-                string text = ttok.Token.value;
-                string textLower = ttok.LowerCaseText;
-                nextBeamUsed = 0;
-                int[] possibleTags = possiblePosTags(sentence, i);
+                TaggedToken taggedToken = sentence[i];
+
+                string text = taggedToken.Token.Value;
+
+                string textLower = taggedToken.LowerCaseText;
+
+                var nextBeamUsed = 0;
+
+                int[] possibleTags = PossiblePosTags(sentence, i);
+
                 int neTag = sentence[i].NeTag;
+
                 int neTypeTag = sentence[i].NeTypeTag;
-                assert possibleTags.Length > 0;
-                /*
-                if(!trainingMode) {
-                System.out.print(textLower + "   ");
-                for(int l=0; l<possibleTags.Length; l++)
-                    System.out.print(" " + possibleTags[l]);
-                System.out.println("");
-                }
-                */
-                // First, go through all possible tags.
-                for (int posTag : possibleTags)
+
+                Debug.Assert(possibleTags.Length > 0);
+
+                foreach (int posTag in possibleTags)
                 {
-                    // Get history-independent features.
-                    int nLocalFeats = getPosFeats(
-                        sentence, i, feats, values, 0, posTag, neTag, neTypeTag,
-                        false, null, false);
-                    // Then go through the available histories.
+                    int localFeaturesCount = GetPosFeatures(sentence, i, features, values, 0, posTag, neTag, neTypeTag, false, null, false);
+
                     for (int j = 0; j < beamUsed; j++)
                     {
-                        History history = beam[j];
-                        // Get history-dependent features.
-                        int nFeats = getPosFeats(
-                            sentence, i, feats, values, nLocalFeats, posTag,
-                            neTag, neTypeTag, true, history, false);
-                        // Get the score of all features for the local decision.
-                        double score = posPerceptron.Score(
-                            feats, values, nFeats, average);
-                        // Compute the local + history score.
-                        if (history != null) score += history.Score;
-                        /*
-                        if(!trainingMode) {
-                            for(int q=0; q<nFeats; q++)
-                                System.err.print(feats[q]+"="+values[q]+" ");
-                            System.err.println(score);
+                        History beamHistory = beam[j];
+
+                        int featuresCount = GetPosFeatures(sentence, i, features, values, localFeaturesCount, posTag, neTag, neTypeTag, true, beamHistory, false);
+
+                        double score = PosPerceptron.Score(features, values, featuresCount, average);
+
+                        if (beamHistory != null)
+                        {
+                            score += beamHistory.Score;
                         }
-                        */
-                        // If the beam is empty, always add this decision.
+
                         if (nextBeamUsed == 0)
                         {
-                            nextBeam[0] = new History(
-                                text, textLower,
-                                ttok.Lemma, posTag, neTag, neTypeTag, score,
-                                history);
+                            nextBeam[0] = new History(text, textLower, taggedToken.Lemma, posTag, neTag, neTypeTag, score, beamHistory);
+
                             nextBeamUsed = 1;
                         }
                         else
                         {
-                            // Otherwise, only add it if the score is higher than
-                            // the lowest score currently in the beam.
                             if (score > nextBeam[nextBeamUsed - 1].Score)
                             {
                                 int l = nextBeamUsed - 1;
-                                // If the beam has space left, make an extra copy
-                                // of the smallest element. In the following step
-                                // the smallest element will be deleted.
-                                if (nextBeamUsed < posBeamSize)
+
+                                if (nextBeamUsed < PosBeamSize)
                                 {
                                     nextBeam[l + 1] = nextBeam[l];
+
                                     nextBeamUsed++;
                                 }
+
                                 l--;
-                                // Move histories with lower scores than the
-                                // current one step to the right, until we find
-                                // the right place to insert the current history.
+
                                 while (l >= 0 && score > nextBeam[l].Score)
                                 {
                                     nextBeam[l + 1] = nextBeam[l];
+
                                     l--;
                                 }
-                                // Create and insert the new history.
-                                nextBeam[l + 1] = new History(
-                                    text, textLower, ttok.Lemma,
-                                    posTag, neTag, neTypeTag, score, history);
+
+                                nextBeam[l + 1] = new History(text, textLower, taggedToken.Lemma, posTag, neTag, neTypeTag, score, beamHistory);
                             }
-                            else if (nextBeamUsed < posBeamSize)
+                            else if (nextBeamUsed < PosBeamSize)
                             {
-                                nextBeam[nextBeamUsed++] = new History(
-                                    text, textLower, ttok.Lemma,
-                                    posTag, neTag, neTypeTag, score, history);
+                                nextBeam[nextBeamUsed++] = new History(text, textLower, taggedToken.Lemma, posTag, neTag, neTypeTag, score, beamHistory);
                             }
                         }
                     }
                 }
-                System.arraycopy(nextBeam, 0, beam, 0, nextBeamUsed);
+
+                Array.Copy(nextBeam, 0, beam, 0, nextBeamUsed);
+
                 beamUsed = nextBeamUsed;
             }
-            /*
-            if(!trainingMode) {
-                for(int i=0; i<beamUsed; i++) {
-                    System.out.println("Score of "+i+": "+beam[i].score);
-                }
-            }
-            */
-            // Copy the annotation of the best history to the sentence.
+
             History history = beam[0];
+
             for (int i = 0; i < sentence.Length; i++)
             {
+                Debug.Assert(history != null);
+
                 sentence[sentence.Length - (i + 1)].PosTag = history.PosTag;
+
                 history = history.Last;
             }
-            assert(history == null);
+
+            Debug.Assert(history == null);
         }
 
-        // May be implemented by a subclass
-        protected void guessTags(string wordForm, bool firstWord)
+        protected virtual void GuessTags(string wordForm, bool firstWord)
         {
-            return;
         }
 
-        /** Returns an array of possible POS tags for a given token.
-         *
-         * @param tokens        we will look at tokens[idx]
-         * @param idx           see above
-         * @return              array of possible POS tags
-         */
-        protected int[] possiblePosTags(TaggedToken[] sent, int idx)
+        protected int[] PossiblePosTags(TaggedToken[] sentence, int index)
         {
-            string textLower = sent[idx].LowerCaseText;
-            if (!trainingMode)
-                guessTags(sent[idx].Token.value, (idx == 0));
+            string textLower = sentence[index].LowerCaseText;
 
-            Lexicon.Entry[] entries = posLexicon.getEntries(textLower);
+            if (!TrainingMode)
+            {
+                GuessTags(sentence[index].Token.Value, (index == 0));
+            }
+
+            Entry[] entries = PosLexicon.GetEntries(textLower);
+
             if (entries == null)
             {
-                return tokenTypeTags[sent[idx].Token.type];
+                return TokenTypeTags[(int)sentence[index].Token.Type];
             }
+
             int[] tags = new int[entries.Length];
-            int nTags = 0;
-            int nSeen = 0;
+
+            int tagsCount = 0;
+
             int lastTag = -1;
-            for (Lexicon.Entry entry : entries)
-                nSeen += entry.n;
-            // Go through the list of entries (sorted by tag ID), and put its
-            // unique elements into the tag array.
-            for (Lexicon.Entry entry : entries)
+
+            int seenCount = entries.Sum(entry => entry.NumberOfOccurence);
+
+            foreach (Entry entry in entries)
             {
-                // If extendLexicon is false, and this is a known word (as
-                // estimated by its non-zero count), then skip any entry that does
-                // not occur in the training data.
-                if (nSeen > 0 && !extendLexicon && entry.n == 0) continue;
-                // Add any tag that has not already been added.
-                if (entry.tag != lastTag)
+                if (seenCount > 0 && !ExtendLexicon && entry.NumberOfOccurence == 0)
                 {
-                    tags[nTags++] = entry.tag;
-                    lastTag = entry.tag;
+                    continue;
+                }
+
+                if (entry.TagId != lastTag)
+                {
+                    tags[tagsCount++] = entry.TagId;
+
+                    lastTag = entry.TagId;
                 }
             }
-            for (int t = 0; t < nTags - 1; t++)
-                assert(tags[t] < tags[t + 1]);
-            // If the word form is frequent enough (or we are not in training
-            // mode), return the lexicon tags directly.
-            if (!trainingMode || nSeen >= countLimit)
+
+            for (int t = 0; t < tagsCount - 1; t++)
             {
-                if (nTags != tags.Length) return Arrays.copyOf(tags, nTags);
-                else return tags;
+                Debug.Assert(tags[t] < tags[t + 1]);
             }
-            // Otherwise, merge the lexicon tags with the array of open tags
-            int[] possibleTags = tokenTypeTags[sent[idx].Token.type];
+
+            if (!TrainingMode || seenCount >= CountLimit)
+            {
+                return tagsCount != tags.Length ? Arrays.CopyOf(tags, tagsCount) : tags;
+            }
+
+            int[] possibleTags = TokenTypeTags[(int)sentence[index].Token.Type];
+
             int[] lexiconTags = tags;
+
             int i = 0, j = 0, k = 0;
-            tags = new int[nTags + possibleTags.Length];
-            for (; j < possibleTags.Length && k < nTags; i++)
+
+            tags = new int[tagsCount + possibleTags.Length];
+
+            for (; j < possibleTags.Length && k < tagsCount; i++)
             {
                 if (possibleTags[j] < lexiconTags[k])
                 {
@@ -632,727 +586,907 @@ namespace Stagger
                     tags[i] = lexiconTags[k++];
                 }
             }
+
             if (j < possibleTags.Length)
             {
                 for (; j < possibleTags.Length; j++) tags[i++] = possibleTags[j];
             }
             else
             {
-                for (; k < nTags; k++) tags[i++] = lexiconTags[k];
+                for (; k < tagsCount; k++) tags[i++] = lexiconTags[k];
             }
-            nTags = i;
-            for (int t = 0; t < nTags - 1; t++)
-                assert(tags[t] < tags[t + 1]);
-            if (nTags != tags.Length) return Arrays.copyOf(tags, nTags);
-            else return tags;
+
+            tagsCount = i;
+
+            for (int t = 0; t < tagsCount - 1; t++)
+            {
+                Debug.Assert(tags[t] < tags[t + 1]);
+            }
+
+            return tagsCount != tags.Length ? Arrays.CopyOf(tags, tagsCount) : tags;
         }
 
-        protected void trainNE(
-        TaggedToken[][] trainSents, TaggedToken[][] devSents)
+        protected void TrainNe(TaggedToken[][] trainSentences, TaggedToken[][] developmentSentences)
         {
-            nePerceptron.StartTraining();
+            NePerceptron.StartTraining();
 
-            // Create a list of ints 0 to trainSents.Length-1 (inclusive),
-            // which will be the order than sentences are processed during a
-            // training iteration. This may be permuted at each iteration.
-            List<int> trainOrder =
-                new List<int>(trainSents.Length);
-            for (int i = 0; i < trainSents.Length; i++) trainOrder.Add(new int(i));
+            List<int> trainOrder = new List<int>(trainSentences.Length);
 
-            // The peak accuracy on the development set.
-            int bestIter = 0;
+            for (int i = 0; i < trainSentences.Length; i++)
+            {
+                trainOrder.Add(i);
+            }
+
+            int bestIterations = 0;
+
             double bestAccuracy = 0.0;
 
-            for (int iter = 0; iter < maximumNeIterations; iter++)
+            for (int iterations = 0; iterations < MaximumNeIterations; iterations++)
             {
-                // Randomly reorder the sequence of training sentences.
-                // Collections.shuffle(trainOrder);
-                System.err.println("Starting NE iteration " + iter);
-                // Number of tokens since last weight accumulation.
+                Console.WriteLine($"Starting NE iteration {iterations}");
+
                 int tokenCount = 0;
+
                 Evaluation trainEvaluation = new Evaluation();
-                for (int sentIdx : trainOrder)
+
+                foreach (int sentenceIndex in trainOrder)
                 {
-                    TaggedToken[] trainSent = trainSents[sentIdx];
-                    // If this sentence does not contain NE tags, skip it.
-                    if (trainSent.Length == 0 || trainSent[0].NeTag < 0)
+                    TaggedToken[] trainSentence = trainSentences[sentenceIndex];
+
+                    if (trainSentence.Length == 0 || trainSentence[0].NeTag < 0)
+                    {
                         continue;
-                    TaggedToken[] taggedSent = new TaggedToken[trainSent.Length];
-                    for (int i = 0; i < trainSent.Length; i++)
-                        taggedSent[i] = new TaggedToken(trainSent[i]);
-                    tagNE(taggedSent, false);
-                    trainEvaluation.Evaluate(taggedSent, trainSent);
-                    // Only perform weight updates if the sentence was incorrectly
-                    // tagged
-                    if (!trainEvaluation.AreNesEqual(taggedSent, trainSent))
-                    {
-                        neUpdateWeights(taggedSent, trainSent);
                     }
-                    // Check if it is time to accumulate perceptron weights.
-                    tokenCount += trainSent.Length;
-                    if (tokenCount > accumulateLimit)
+
+                    TaggedToken[] taggedSentence = new TaggedToken[trainSentence.Length];
+
+                    for (int i = 0; i < trainSentence.Length; i++)
                     {
-                        nePerceptron.AccumulateWeights();
+                        taggedSentence[i] = new TaggedToken(trainSentence[i]);
+                    }
+
+                    TagNe(taggedSentence, false);
+
+                    trainEvaluation.Evaluate(taggedSentence, trainSentence);
+
+                    if (!trainEvaluation.CheckNesEqual(taggedSentence, trainSentence))
+                    {
+                        NeUpdateWeights(taggedSentence, trainSentence);
+                    }
+
+                    tokenCount += trainSentence.Length;
+
+                    if (tokenCount > AccumulateLimit)
+                    {
+                        NePerceptron.AccumulateWeights();
+
                         tokenCount = 0;
                     }
                 }
-                System.err.println("Training set F-score: " +
-                    trainEvaluation.GetNeScore());
 
-                if (devSents == null)
+                Console.WriteLine($"Training set F-score: {trainEvaluation.GetNeFScore()}");
+
+                if (developmentSentences == null)
                 {
-                    if (iter == maximumNeIterations - 1) nePerceptron.MakeBestWeight();
+                    if (iterations == MaximumNeIterations - 1)
+                    {
+                        NePerceptron.MakeBestWeight();
+                    }
+
                     continue;
                 }
 
-                Evaluation devEvaluation = new Evaluation();
-                for (int sentIdx = 0; sentIdx < devSents.Length; sentIdx++)
+                Evaluation developmentEvaluation = new Evaluation();
+
+                foreach (TaggedToken[] developmentSent in developmentSentences)
                 {
-                    TaggedToken[] devSent = devSents[sentIdx];
-                    TaggedToken[] taggedSent = new TaggedToken[devSent.Length];
-                    for (int i = 0; i < devSent.Length; i++)
+                    TaggedToken[] taggedSentence = new TaggedToken[developmentSent.Length];
+
+                    for (int i = 0; i < developmentSent.Length; i++)
                     {
-                        taggedSent[i] = new TaggedToken(devSent[i]);
+                        taggedSentence[i] = new TaggedToken(developmentSent[i]);
                     }
-                    trainingMode = false;
-                    tagNE(taggedSent, true);
-                    trainingMode = true;
-                    devEvaluation.Evaluate(taggedSent, devSent);
+
+                    TrainingMode = false;
+
+                    TagNe(taggedSentence, true);
+
+                    TrainingMode = true;
+
+                    developmentEvaluation.Evaluate(taggedSentence, developmentSent);
                 }
-                double devAccuracy = devEvaluation.GetNeScore();
-                System.err.println("Development set F-score: " + devAccuracy);
-                if ((devAccuracy - bestAccuracy) / devAccuracy > 0.00025)
+
+                double developmentAccuracy = developmentEvaluation.GetNeFScore();
+
+                Console.WriteLine($"Development set F-Score: {developmentAccuracy}");
+
+                if ((developmentAccuracy - bestAccuracy) / developmentAccuracy > 0.00025)
                 {
-                    bestAccuracy = devAccuracy;
-                    bestIter = iter;
-                    nePerceptron.MakeBestWeight();
+                    bestAccuracy = developmentAccuracy;
+
+                    bestIterations = iterations;
+
+                    NePerceptron.MakeBestWeight();
                 }
-                else if (bestIter <= iter - 3)
+                else if (bestIterations <= iterations - 3)
                 {
-                    System.err.println("F-score not increasing, we are done.");
+                    Console.WriteLine("F-score not increasing, we are done.");
+
                     break;
                 }
 
             }
-            nePerceptron.EndTraining();
+
+            NePerceptron.EndTraining();
         }
 
-        /**
-         * Update the weights according to the target and model taggings.
-         *
-         * TODO: this could be merged with posUpdateWeights
-         */
-        private void neUpdateWeights(
-        TaggedToken[] taggedSent, TaggedToken[] trainSent)
+        private void NeUpdateWeights(TaggedToken[] taggedSentence, TaggedToken[] trainSentence)
         {
-            assert(taggedSent.Length == trainSent.Length);
-            History[] taggedHistory = sentToHistory(taggedSent);
-            History[] trainHistory = sentToHistory(trainSent);
-            int[] feats = new int[maxFeats];
-            double[] values = new double[maxFeats];
-            for (int i = 0; i < taggedSent.Length; i++)
-            {
-                int nFeats;
-                History tagged = taggedHistory[i];
-                History train = trainHistory[i];
-                // Compute feature values for negative example.
-                nFeats = getNEFeats(
-                    taggedSent, i, feats, values, 0, tagged.PosTag,
-                    tagged.NeTag, tagged.NeTypeTag, tagged.Last, true);
-                nePerceptron.UpdateWeights(feats, values, nFeats, false);
+            Debug.Assert(taggedSentence.Length == trainSentence.Length);
 
-                // TODO: consider caching this
-                // Compute feature values for positive example.
-                nFeats = getNEFeats(
-                    trainSent, i, feats, values, 0, train.PosTag,
-                    train.NeTag, train.NeTypeTag, train.Last, true);
-                nePerceptron.UpdateWeights(feats, values, nFeats, true);
+            History[] taggedHistory = SentenceToHistory(taggedSentence);
+
+            History[] trainHistory = SentenceToHistory(trainSentence);
+
+            int[] features = new int[MaximumFeatures];
+
+            double[] values = new double[MaximumFeatures];
+
+            for (int i = 0; i < taggedSentence.Length; i++)
+            {
+                History tagged = taggedHistory[i];
+
+                History train = trainHistory[i];
+
+                int featuresCount = GetNeFeatures(taggedSentence, i, features, values, 0, tagged.PosTag, tagged.NeTag, tagged.NeTypeTag, tagged.Last, true);
+
+                NePerceptron.UpdateWeights(features, values, featuresCount, false);
+
+                featuresCount = GetNeFeatures(trainSentence, i, features, values, 0, train.PosTag, train.NeTag, train.NeTypeTag, train.Last, true);
+
+                NePerceptron.UpdateWeights(features, values, featuresCount, true);
             }
         }
 
-        void tagNE(TaggedToken[] sentence, bool average)
+        private void TagNe(TaggedToken[] sentence, bool average)
         {
-            History[] beam = new History[neBeamSize];
-            History[] nextBeam = new History[neBeamSize];
-            int[] feats = new int[maxFeats];
-            double[] values = new double[maxFeats];
+            History[] beam = new History[NeBeamSize];
+
+            History[] nextBeam = new History[NeBeamSize];
+
+            int[] features = new int[MaximumFeatures];
+
+            double[] values = new double[MaximumFeatures];
+
             beam[0] = null;
-            int beamUsed = 1, nextBeamUsed;
+
+            int beamUsed = 1;
+
             for (int i = 0; i < sentence.Length; i++)
             {
-                TaggedToken ttok = sentence[i];
-                string text = ttok.Token.value;
-                string textLower = ttok.LowerCaseText;
-                nextBeamUsed = 0;
+                TaggedToken token = sentence[i];
+
+                string text = token.Token.Value;
+
+                string textLower = token.LowerCaseText;
+
+                var nextBeamUsed = 0;
+
                 int posTag = sentence[i].PosTag;
+
                 for (int neTag = 0; neTag < TaggedData.NeTags; neTag++)
                 {
-                    // Can not start with an I tag.
-                    if (i == 0 && neTag == TaggedData.NeI) continue;
-                    // Go through the available histories.
+                    if (i == 0 && neTag == TaggedData.NeI)
+                    {
+                        continue;
+                    }
+
                     for (int j = 0; j < beamUsed; j++)
                     {
-                        History history = beam[j];
-                        // O -> I transitions not allowed
-                        if ((history == null ||
-                            history.NeTag == TaggedData.NeO) &&
-                           neTag == TaggedData.NeI)
+                        History beamHistory = beam[j];
+
+                        if ((beamHistory == null || beamHistory.NeTag == TaggedData.NeO) && neTag == TaggedData.NeI)
+                        {
                             continue;
+                        }
+
                         int minType = -1, maxType = -1;
+
                         if (neTag == TaggedData.NeI)
                         {
-                            minType = history.NeTypeTag;
-                            maxType = history.NeTypeTag;
+                            Debug.Assert(beamHistory != null);
+
+                            minType = beamHistory.NeTypeTag;
+
+                            maxType = beamHistory.NeTypeTag;
                         }
                         else if (neTag == TaggedData.NeB)
                         {
                             minType = 0;
-                            maxType = taggedData.getNETypeTagSet().size() - 1;
+
+                            maxType = Data.NeTypeTagSet.Size - 1;
                         }
+
                         for (int neTypeTag = minType; neTypeTag <= maxType; neTypeTag++)
                         {
-                            int nFeats = getNEFeats(
-                                sentence, i, feats, values, 0,
-                                posTag, neTag, neTypeTag, history, false);
-                            // Get the score of all features for the local
-                            // decision.
-                            double score = nePerceptron.Score(
-                                feats, values, nFeats, average);
-                            // Compute the local + history score.
-                            if (history != null) score += history.Score;
-                            // If the beam is empty, always add this decision.
+                            int nFeats = GetNeFeatures(sentence, i, features, values, 0, posTag, neTag, neTypeTag, beamHistory, false);
+
+                            double score = NePerceptron.Score(features, values, nFeats, average);
+
+                            if (beamHistory != null)
+                            {
+                                score += beamHistory.Score;
+                            }
+
                             if (nextBeamUsed == 0)
                             {
-                                nextBeam[0] = new History(
-                                    text, textLower,
-                                    ttok.Lemma, posTag, neTag, neTypeTag, score,
-                                    history);
+                                nextBeam[0] = new History(text, textLower, token.Lemma, posTag, neTag, neTypeTag, score, beamHistory);
+
                                 nextBeamUsed = 1;
                             }
                             else
                             {
-                                // Otherwise, only add it if the score is higher
-                                // than the lowest score currently in the beam.
                                 if (score > nextBeam[nextBeamUsed - 1].Score)
                                 {
                                     int l = nextBeamUsed - 1;
-                                    // If the beam has space left, make an extra
-                                    // copy of the smallest element. In the
-                                    // following step the smallest element will
-                                    // be deleted.
-                                    if (nextBeamUsed < neBeamSize)
+
+                                    if (nextBeamUsed < NeBeamSize)
                                     {
                                         nextBeam[l + 1] = nextBeam[l];
+
                                         nextBeamUsed++;
                                     }
+
                                     l--;
-                                    // Move histories with lower scores than the
-                                    // current one step to the right, until we find
-                                    // the right place to insert the current
-                                    // history.
+
                                     while (l >= 0 && score > nextBeam[l].Score)
                                     {
                                         nextBeam[l + 1] = nextBeam[l];
+
                                         l--;
                                     }
-                                    // Create and insert the new history.
-                                    nextBeam[l + 1] = new History(
-                                        text, textLower, ttok.Lemma,
-                                        posTag, neTag, neTypeTag, score, history);
+
+                                    nextBeam[l + 1] = new History(text, textLower, token.Lemma, posTag, neTag, neTypeTag, score, beamHistory);
                                 }
-                                else if (nextBeamUsed < neBeamSize)
+                                else if (nextBeamUsed < NeBeamSize)
                                 {
-                                    nextBeam[nextBeamUsed++] = new History(
-                                        text, textLower, ttok.Lemma,
-                                        posTag, neTag, neTypeTag, score, history);
+                                    nextBeam[nextBeamUsed++] = new History(text, textLower, token.Lemma, posTag, neTag, neTypeTag, score, beamHistory);
                                 }
                             }
                         }
                     }
                 }
-                System.arraycopy(nextBeam, 0, beam, 0, nextBeamUsed);
+
+                Array.Copy(nextBeam, 0, beam, 0, nextBeamUsed);
+
                 beamUsed = nextBeamUsed;
             }
-            /*
-            if(!trainingMode) {
-                for(int i=0; i<beamUsed; i++) {
-                    System.out.println("Score of "+i+": "+beam[i].score);
-                }
-            }
-            */
-            // Copy the annotation of the best history to the sentence.
+
             History history = beam[0];
+
             for (int i = 0; i < sentence.Length; i++)
             {
+                Debug.Assert(history != null);
+
                 sentence[sentence.Length - (i + 1)].NeTag = history.NeTag;
+
                 sentence[sentence.Length - (i + 1)].NeTypeTag = history.NeTypeTag;
+
                 history = history.Last;
             }
-            assert(history == null);
+
+            Debug.Assert(history == null);
         }
 
-        /**
-         * Computes feature values given a certain POS tag and context.
-         */
-        protected int getPosFeats(
-        TaggedToken[] sentence, int idx, int[] feats, double[] values, int nFeats,
-        int posTag, int neTag, int neTypeTag, bool hasLast, History last,
-        bool extend)
+        protected int GetPosFeatures(TaggedToken[] sentence, int index, int[] features, double[] values, int featuresCount, int posTag, int neTag, int neTypeTag, bool hasLast, History history, bool extend)
         {
             char[] head = new char[8];
-            int f;
-            TaggedToken ttok = sentence[idx];
-            char isInitial = (idx == 0) ? (char)1 : (char)0;
-            char isFinal = (idx == sentence.Length - 1) ? (char)1 : (char)0;
-            char capitalization = ttok.Token.isCapitalized() ? (char)1 : (char)0;
-            char tokType = (char)ttok.Token.type;
-            char tokType1a = (idx == sentence.Length - 1) ? 0xffff :
-                             (char)sentence[idx + 1].Token.type;
-            string text = ttok.Token.value;
-            string textLower = ttok.LowerCaseText;
-            string nextText =
-                (idx == sentence.Length - 1) ? "" : sentence[idx + 1].Token.value;
-            string nextText2 =
-                (idx >= sentence.Length - 2) ? "" : sentence[idx + 2].Token.value;
-            string lastLower = (idx == 0) ? "" : sentence[idx - 1].LowerCaseText;
-            string lastLower2 = (idx < 2) ? "" : sentence[idx - 2].LowerCaseText;
-            string nextLower =
-                (idx == sentence.Length - 1) ? "" : sentence[idx + 1].LowerCaseText;
-            string nextLower2 =
-                (idx >= sentence.Length - 2) ? "" : sentence[idx + 2].LowerCaseText;
+
+            int id;
+
+            TaggedToken token = sentence[index];
+
+            char isInitial = (index == 0) ? (char)1 : (char)0;
+
+            char isFinal = (index == sentence.Length - 1) ? (char)1 : (char)0;
+
+            char capitalization = token.Token.IsCapitalized ? (char)1 : (char)0;
+
+            char tokenType = (char)token.Token.Type;
+
+            char tokenType1A = (index == sentence.Length - 1) ? (char)0xffff : (char)sentence[index + 1].Token.Type;
+
+            string text = token.Token.Value;
+
+            string textLower = token.LowerCaseText;
+
+            string nextText = (index == sentence.Length - 1) ? "" : sentence[index + 1].Token.Value;
+
+            string nextText2 = (index >= sentence.Length - 2) ? "" : sentence[index + 2].Token.Value;
+
+            string lastLower = (index == 0) ? "" : sentence[index - 1].LowerCaseText;
+
+            string lastLower2 = (index < 2) ? "" : sentence[index - 2].LowerCaseText;
+
+            string nextLower = (index == sentence.Length - 1) ? "" : sentence[index + 1].LowerCaseText;
+
+            string nextLower2 = (index >= sentence.Length - 2) ? "" : sentence[index + 2].LowerCaseText;
 
             if (!hasLast)
             {
                 // POS + textLower + final?
-                head[0] = 0x00;
+                head[0] = (char)0x00;
+
                 head[1] = (char)posTag;
+
                 head[2] = isFinal;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 3) + textLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 3) + textLower, extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + textLower + capitalization + initial?
-                head[0] = 0x01;
+                head[0] = (char)0x01;
+
                 head[1] = (char)posTag;
+
                 head[2] = capitalization;
+
                 head[3] = isInitial;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 4) + textLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 4) + textLower, extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + textLower + lastLower
-                head[0] = 0x02;
+                head[0] = (char)0x02;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 2) + lastLower + "\n" + textLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{lastLower}\n{textLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + textLower + nextLower
-                head[0] = 0x03;
+                head[0] = (char)0x03;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 2) + textLower + "\n" + nextLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{textLower}\n{nextLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + textLower + nextLower + nextLower2
-                head[0] = 0x04;
+                head[0] = (char)0x04;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(new string(head, 0, 2) +
-                    textLower + "\n" + nextLower + "\n" + nextLower2, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{textLower}\n{nextLower}\n{nextLower2}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + lastLower + textLower + nextLower
-                head[0] = 0x05;
+                head[0] = (char)0x05;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(new string(head, 0, 2) +
-                    lastLower + "\n" + textLower + "\n" + nextLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{lastLower}\n{textLower}\n{nextLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + lastLower2 + lastLower + textLower
-                head[0] = 0x06;
+                head[0] = (char)0x06;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(new string(head, 0, 2) +
-                    lastLower2 + "\n" + lastLower + "\n" + textLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{lastLower2}\n{lastLower}\n{textLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + lastLower
-                head[0] = 0x07;
+                head[0] = (char)0x07;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 2) + lastLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{lastLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + lastLower2
-                head[0] = 0x08;
+                head[0] = (char)0x08;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 2) + lastLower2, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{lastLower2}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + nextLower
-                head[0] = 0x09;
+                head[0] = (char)0x09;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 2) + nextLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{nextLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + nextLower2
-                head[0] = 0x0a;
+                head[0] = (char)0x0a;
+
                 head[1] = (char)posTag;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 2) + nextLower2, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 2)}{nextLower2}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + prefixes + capitalization + initial?
-                head[0] = 0x10;
+                head[0] = (char)0x10;
+
                 head[1] = (char)posTag;
+
                 head[2] = capitalization;
+
                 head[3] = isInitial;
-                for (int i = 1; i <= 4 && i < textLower.Length(); i++)
+
+                for (int i = 1; i <= 4 && i < textLower.Length; i++)
                 {
-                    string prefix = textLower.substring(0, i);
-                    if (allowedPrefixes == null ||
-                       allowedPrefixes.contains(prefix))
+                    string prefix = textLower.Substring(0, i);
+
+                    if (AllowedPrefixes == null || AllowedPrefixes.Contains(prefix))
                     {
-                        f = posPerceptron.getFeatureID(new string(head, 0, 4) +
-                            prefix, extend);
-                        if (f >= 0)
+                        id = PosPerceptron.GetFeatureId(new string(head, 0, 4) + prefix, extend);
+
+                        if (id >= 0)
                         {
-                            feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
+                            features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++;
                         }
                     }
                 }
+
 
                 // POS + suffixes + capitalization + initial?
-                head[0] = 0x11;
+                head[0] = (char)0x11;
+
                 head[1] = (char)posTag;
+
                 head[2] = capitalization;
+
                 head[3] = isInitial;
-                for (int i = textLower.Length() - 5; i < textLower.Length(); i++)
+
+                for (int i = textLower.Length - 5; i < textLower.Length; i++)
                 {
                     if (i < 2) continue;
-                    string suffix = textLower.substring(i);
-                    if (allowedSuffixes == null ||
-                       allowedSuffixes.contains(suffix))
+
+                    string suffix = textLower.Substring(i);
+
+                    if (AllowedSuffixes == null || AllowedSuffixes.Contains(suffix))
                     {
-                        f = posPerceptron.getFeatureID(new string(head, 0, 4) +
-                            suffix, extend);
-                        if (f >= 0)
+                        id = PosPerceptron.GetFeatureId(new string(head, 0, 4) + suffix, extend);
+
+                        if (id >= 0)
                         {
-                            feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
+                            features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++;
                         }
                     }
                 }
 
+
                 // POS + dictionary
-                head[0] = 0x12;
+                head[0] = (char)0x12;
+
                 head[1] = (char)posTag;
-                for (int i = 0; i < posDictionaries.size(); i++)
+
+                for (int i = 0; i < PosDictionaries.Count; i++)
                 {
-                    Dictionary dict = posDictionaries.get(i);
-                    string value = dict.map.get(text);
-                    string nextValue =
-                        (i == sentence.Length - 1) ? "" :
-                        dict.map.get(nextText);
-                    string nextValue2 =
-                        (i >= sentence.Length - 2) ? "" :
-                        dict.map.get(nextText2);
+                    Dictionary dictionary = PosDictionaries[i];
+
+                    string value = dictionary.Map[text];
+
+                    string nextValue = (i == sentence.Length - 1) ? "" : dictionary.Map[nextText];
+
+                    string nextValue2 = (i >= sentence.Length - 2) ? "" : dictionary.Map[nextText2];
+
                     head[2] = (char)i;
-                    string[] combinations = {
-                    value,
-                    (value == null || nextValue == null)? null :
-                        value + "\n" + nextValue,
-                    nextValue,
-                    (nextValue == null || nextValue2 == null)? null :
-                        nextValue + "\n" + nextValue2,
-                    nextValue2
-                };
+
+                    string[] combinations = { value, (value == null || nextValue == null) ? null : $"{value}\n{nextValue}", nextValue, (nextValue == null || nextValue2 == null) ? null : $"{nextValue}\n{nextValue2}", nextValue2 };
+
                     for (int j = 0; j < combinations.Length; j++)
                     {
                         if (combinations[j] == null) continue;
+
                         head[3] = (char)j;
-                        f = posPerceptron.getFeatureID(
-                            new string(head, 0, 4) + combinations[j], extend);
-                        if (f >= 0)
+
+                        id = PosPerceptron.GetFeatureId(new string(head, 0, 4) + combinations[j], extend);
+
+                        if (id >= 0)
                         {
-                            feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
+                            features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++;
                         }
                     }
                 }
 
+
                 // POS + embedding
-                head[0] = 0x13;
+                head[0] = (char)0x13;
+
                 head[1] = (char)posTag;
-                for (int i = 0; i < posEmbeddings.size(); i++)
+
+                for (int i = 0; i < PosEmbeddings.Count; i++)
                 {
-                    float[] value = posEmbeddings.get(i).map.get(textLower);
+                    float[] value = PosEmbeddings[i].Map[textLower];
+
                     if (value == null) continue;
+
                     head[2] = (char)i;
+
                     for (int j = 0; j < value.Length; j++)
                     {
                         head[3] = (char)j;
-                        f = posPerceptron.getFeatureID(
-                            new string(head, 0, 4), extend);
-                        if (f >= 0)
+
+                        id = PosPerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+                        if (id >= 0)
                         {
-                            feats[nFeats] = f; values[nFeats] = value[j]; nFeats++;
+                            features[featuresCount] = id; values[featuresCount] = value[j]; featuresCount++;
                         }
                     }
                 }
 
+
                 // POS + token type + contains dash?
-                head[0] = 0x20;
+                head[0] = (char)0x20;
+
                 head[1] = (char)posTag;
-                head[2] = tokType;
-                head[3] = (char)(textLower.contains("-") ? 1 : 0);
-                f = posPerceptron.getFeatureID(new string(head, 0, 4), extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                head[2] = tokenType;
+
+                head[3] = (char)(textLower.Contains("-") ? 1 : 0);
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // POS + (current, next) token type
-                head[0] = 0x21;
+                head[0] = (char)0x21;
+
                 head[1] = (char)posTag;
-                head[2] = tokType;
-                head[3] = tokType1a;
-                f = posPerceptron.getFeatureID(new string(head, 0, 4), extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                head[2] = tokenType;
+
+                head[3] = tokenType1A;
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
             }
             else
             {
-                char posTag1b = 0xffff;
-                char posTag2b = 0xffff;
-                if (last != null)
+                char posTag1B = (char)0xffff;
+
+                char posTag2B = (char)0xffff;
+
+                if (history != null)
                 {
-                    posTag1b = (char)last.PosTag;
-                    if (last.Last != null) posTag2b = (char)last.Last.PosTag;
+                    posTag1B = (char)history.PosTag;
+
+                    if (history.Last != null) posTag2B = (char)history.Last.PosTag;
                 }
 
+
                 // (previous, current) POS
-                head[0] = 0x80;
+                head[0] = (char)0x80;
+
                 head[1] = (char)posTag;
-                head[2] = posTag1b;
-                f = posPerceptron.getFeatureID(new string(head, 0, 3), extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                head[2] = posTag1B;
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 3), extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // (previous2, previous, current) POS
-                head[0] = 0x81;
+                head[0] = (char)0x81;
+
                 head[1] = (char)posTag;
-                head[2] = posTag1b;
-                head[3] = posTag2b;
-                f = posPerceptron.getFeatureID(new string(head, 0, 4), extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                head[2] = posTag1B;
+
+                head[3] = posTag2B;
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // (previous, current) POS + textLower
-                head[0] = 0x82;
+                head[0] = (char)0x82;
+
                 head[1] = (char)posTag;
-                head[2] = posTag1b;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 3) + textLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                head[2] = posTag1B;
+
+                id = PosPerceptron.GetFeatureId(new string(head, 0, 3) + textLower, extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // (previous, current) POS + textLower + nextLower
-                head[0] = 0x83;
+                head[0] = (char)0x83;
+
                 head[1] = (char)posTag;
-                head[2] = posTag1b;
-                f = posPerceptron.getFeatureID(
-                    new string(head, 0, 3) + textLower + "\n" + nextLower, extend);
-                if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+                head[2] = posTag1B;
+
+                id = PosPerceptron.GetFeatureId($"{new string(head, 0, 3)}{textLower}\n{nextLower}", extend);
+
+                if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
                 // (previous, current) POS + dictionary
-                head[0] = 0x84;
+                head[0] = (char)0x84;
+
                 head[1] = (char)posTag;
-                head[2] = posTag1b;
-                for (int i = 0; i < posDictionaries.size(); i++)
+
+                head[2] = posTag1B;
+
+                for (int i = 0; i < PosDictionaries.Count; i++)
                 {
-                    Dictionary dict = posDictionaries.get(i);
-                    string nextValue =
-                        (i == sentence.Length - 1) ? null :
-                        dict.map.get(nextText);
+                    Dictionary dictionary = PosDictionaries[i];
+
+                    string nextValue = (i == sentence.Length - 1) ? null : dictionary.Map[nextText];
+
                     if (nextValue == null) continue;
+
                     head[3] = (char)i;
-                    f = posPerceptron.getFeatureID(
-                        new string(head, 0, 4) + nextValue, extend);
-                    if (f >= 0)
+
+                    id = PosPerceptron.GetFeatureId(new string(head, 0, 4) + nextValue, extend);
+
+                    if (id >= 0)
                     {
-                        feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
+                        features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++;
                     }
                 }
             }
 
-            return nFeats;
+            return featuresCount;
         }
 
-        /**
-         * Computes feature values given a certain NE tag and context.
-         */
-        protected int getNEFeats(
-        TaggedToken[] sentence, int idx, int[] feats, double[] values, int nFeats,
-        int posTag, int neTag, int neTypeTag, History last, bool extend)
+        protected int GetNeFeatures(TaggedToken[] sentence, int index, int[] features, double[] values, int featuresCount, int posTag, int neTag, int neTypeTag, History history, bool extend)
         {
             char[] head = new char[8];
-            int f;
-            char isInitial = (idx == 0) ? (char)1 : (char)0;
-            char isFinal = (idx == sentence.Length - 1) ? (char)1 : (char)0;
-            TaggedToken ttok = sentence[idx];
-            char tokType = (char)ttok.Token.type;
-            char capitalization = ttok.Token.isCapitalized() ? (char)1 : (char)0;
-            int posTag1b = (idx == 0) ? 0xffff : sentence[idx - 1].PosTag;
-            int posTag2b = (idx < 2) ? 0xffff : sentence[idx - 2].PosTag;
-            int posTag1a =
-                (idx == sentence.Length - 1) ? 0xffff : sentence[idx + 1].PosTag;
-            string text = ttok.Token.value;
-            string textLower = ttok.LowerCaseText;
-            string lastLower = (idx == 0) ? "" : sentence[idx - 1].LowerCaseText;
-            string lastLower2 = (idx < 2) ? "" : sentence[idx - 2].LowerCaseText;
-            string nextLower =
-                (idx == sentence.Length - 1) ? "" : sentence[idx + 1].LowerCaseText;
-            string nextLower2 =
-                (idx >= sentence.Length - 2) ? "" : sentence[idx + 2].LowerCaseText;
+
+            TaggedToken token = sentence[index];
+
+            char tokenType = (char)token.Token.Type;
+
+            int posTag1B = (index == 0) ? 0xffff : sentence[index - 1].PosTag;
+
+            int posTag1A = (index == sentence.Length - 1) ? 0xffff : sentence[index + 1].PosTag;
+
+            string textLower = token.LowerCaseText;
+
+            string lastLower = (index == 0) ? "" : sentence[index - 1].LowerCaseText;
+
+            string nextLower = (index == sentence.Length - 1) ? "" : sentence[index + 1].LowerCaseText;
+
 
             // tag + type + POS
-            head[0] = 0x00;
+            head[0] = (char)0x00;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
+
             head[3] = (char)posTag;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 4), extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            int id = NePerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // tag + type + (previous, current) POS
-            head[0] = 0x01;
+            head[0] = (char)0x01;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
+
             head[3] = (char)posTag;
-            head[4] = (char)posTag1b;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 5), extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            head[4] = (char)posTag1B;
+
+            id = NePerceptron.GetFeatureId(new string(head, 0, 5), extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // tag + type + (current, next) POS
-            head[0] = 0x02;
+            head[0] = (char)0x02;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
+
             head[3] = (char)posTag;
-            head[4] = (char)posTag1a;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 5), extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            head[4] = (char)posTag1A;
+
+            id = NePerceptron.GetFeatureId(new string(head, 0, 5), extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // tag + type + textLower
-            head[0] = 0x03;
+            head[0] = (char)0x03;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 3) + textLower, extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            id = NePerceptron.GetFeatureId(new string(head, 0, 3) + textLower, extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // tag + type + textLower + nextLower
-            head[0] = 0x04;
+            head[0] = (char)0x04;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 3) + textLower + "\n" + nextLower, extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            id = NePerceptron.GetFeatureId($"{new string(head, 0, 3)}{textLower}\n{nextLower}", extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // tag + type + lastLower + textLower
-            head[0] = 0x04;
+            head[0] = (char)0x04;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 3) + lastLower + "\n" + textLower, extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            id = NePerceptron.GetFeatureId($"{new string(head, 0, 3)}{lastLower}\n{textLower}", extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // dictionaries
-            head[0] = 0x08;
+            head[0] = (char)0x08;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
-            for (int i = 0; i < neDictionaries.size(); i++)
+
+            for (int i = 0; i < NeDictionaries.Count; i++)
             {
-                Dictionary dict = neDictionaries.get(i);
-                string value = dict.map.get(textLower);
-                string lastValue = (i == 0) ? "" : dict.map.get(lastLower);
-                string nextValue =
-                    (i == sentence.Length - 1) ? "" :
-                    dict.map.get(nextLower);
+                Dictionary dictionary = NeDictionaries[i];
+
+                string value = dictionary.Map[textLower];
+
+                string lastValue = (i == 0) ? "" : dictionary.Map[lastLower];
+
+                string nextValue = (i == sentence.Length - 1) ? "" : dictionary.Map[nextLower];
+
                 head[3] = (char)i;
-                string[] combinations = {
-                value,
-                (value == null || lastValue == null)? null :
-                    lastValue + "\n" + value,
-                (value == null || nextValue == null)? null :
-                    value + "\n" + nextValue,
-                nextValue
-            };
+
+                string[] combinations = { value, (value == null || lastValue == null) ? null : $"{lastValue}\n{value}", (value == null || nextValue == null) ? null : $"{value}\n{nextValue}", nextValue };
+
                 for (int j = 0; j < combinations.Length; j++)
                 {
                     if (combinations[j] == null) continue;
+
                     head[4] = (char)j;
-                    f = nePerceptron.getFeatureID(
-                        new string(head, 0, 5) + combinations[j], extend);
-                    if (f >= 0)
+
+                    id = NePerceptron.GetFeatureId(new string(head, 0, 5) + combinations[j], extend);
+
+                    if (id >= 0)
                     {
-                        feats[nFeats] = f; values[nFeats] = 1.0; nFeats++;
+                        features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++;
                     }
                 }
             }
 
+
             // embeddings
-            head[0] = 0x09;
+            head[0] = (char)0x09;
+
             head[1] = (char)neTag;
+
             head[2] = (char)neTypeTag;
-            for (int i = 0; i < neEmbeddings.size(); i++)
+
+            for (int i = 0; i < NeEmbeddings.Count; i++)
             {
-                float[] value = neEmbeddings.get(i).map.get(textLower);
+                float[] value = NeEmbeddings[i].Map[textLower];
+
                 if (value == null) continue;
+
                 head[3] = (char)i;
+
                 for (int j = 0; j < value.Length; j++)
                 {
                     head[4] = (char)j;
-                    f = nePerceptron.getFeatureID(
-                        new string(head, 0, 5), extend);
-                    if (f >= 0)
+
+                    id = NePerceptron.GetFeatureId(new string(head, 0, 5), extend);
+
+                    if (id >= 0)
                     {
-                        feats[nFeats] = f; values[nFeats] = value[j]; nFeats++;
+                        features[featuresCount] = id; values[featuresCount] = value[j]; featuresCount++;
                     }
                 }
             }
 
-            // tag + type + token type
-            head[0] = 0x0a;
-            head[1] = (char)neTag;
-            head[2] = (char)neTypeTag;
-            head[3] = tokType;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 4), extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
 
-            char neTag1b = 0xffff;
-            char neTag2b = 0xffff;
-            if (last != null)
+            // tag + type + token type
+            head[0] = (char)0x0a;
+
+            head[1] = (char)neTag;
+
+            head[2] = (char)neTypeTag;
+
+            head[3] = tokenType;
+
+            id = NePerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
+            char neTag1B = (char)0xffff;
+
+            char neTag2B = (char)0xffff;
+
+            if (history != null)
             {
-                neTag1b = (char)last.NeTag;
-                if (last.Last != null) neTag2b = (char)last.Last.NeTag;
+                neTag1B = (char)history.NeTag;
+
+                if (history.Last != null) neTag2B = (char)history.Last.NeTag;
             }
 
+
             // (previous, current) tag + type
-            head[0] = 0x80;
+            head[0] = (char)0x80;
+
             head[1] = (char)neTag;
-            head[2] = (char)neTag1b;
+
+            head[2] = neTag1B;
+
             head[3] = (char)neTypeTag;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 4), extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+
+            id = NePerceptron.GetFeatureId(new string(head, 0, 4), extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
 
             // (previous, current) tag + type
-            head[0] = 0x81;
-            head[1] = (char)neTag;
-            head[2] = (char)neTag1b;
-            head[3] = (char)neTag2b;
-            head[4] = (char)neTypeTag;
-            f = nePerceptron.getFeatureID(
-                new string(head, 0, 5), extend);
-            if (f >= 0) { feats[nFeats] = f; values[nFeats] = 1.0; nFeats++; }
+            head[0] = (char)0x81;
 
-            return nFeats;
+            head[1] = (char)neTag;
+
+            head[2] = neTag1B;
+
+            head[3] = neTag2B;
+
+            head[4] = (char)neTypeTag;
+
+            id = NePerceptron.GetFeatureId(new string(head, 0, 5), extend);
+
+            if (id >= 0) { features[featuresCount] = id; values[featuresCount] = 1.0; featuresCount++; }
+
+
+            return featuresCount;
         }
     }
 }

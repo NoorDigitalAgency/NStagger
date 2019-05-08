@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace Stagger
 {
@@ -19,29 +20,20 @@ namespace Stagger
 
         public void UpdateWeights(int[] features, double[] values, int featuresCount, bool positive)
         {
-            if (!(featuresCount >= 0 && featuresCount <= features.Length && featuresCount <= values.Length))
-            {
-                throw new Exception("Invalid index of features list or value list specified.");
-            }
+            Debug.Assert(featuresCount >= 0 && featuresCount <= features.Length && featuresCount <= values.Length);
 
-            if (updateCounts == null)
-            {
-                throw new Exception("Update Count List not set.");
-            }
+            Debug.Assert(updateCounts != null);
 
-            if (currentWeights == null)
-            {
-                throw new Exception("Current Weight List not set.");
-            }
+            Debug.Assert(currentWeights != null);
 
             if (positive)
             {
                 for (int i = 0; i < featuresCount; i++)
                 {
                     int feature = features[i];
-
+                    
                     updateCounts[feature]++;
-
+                    
                     currentWeights[feature] += values[i];
                 }
             }
@@ -50,9 +42,9 @@ namespace Stagger
                 for (int i = 0; i < featuresCount; i++)
                 {
                     int feature = features[i];
-
+                    
                     updateCounts[feature]++;
-
+                    
                     currentWeights[feature] -= values[i];
                 }
             }
@@ -67,10 +59,7 @@ namespace Stagger
         {
             double sum = 0.0;
 
-            if (!(featuresCount >= 0 && featuresCount <= features.Length && featuresCount <= values.Length))
-            {
-                throw new Exception("Invalid index of features list or value list specified.");
-            }
+            Debug.Assert(featuresCount >= 0 && featuresCount <= features.Length && featuresCount <= values.Length);
 
             if (currentWeights == null || average)
             {
@@ -118,35 +107,25 @@ namespace Stagger
 
         public void MakeBestWeight()
         {
-            bestWeights = new double[Size];
+            bestWeights = Arrays.CopyOf(sumWeights, Size);
 
-            bestUpdateCounts = new int[Size];
-
-            Array.Copy(sumWeights, bestWeights, Math.Min(Size, sumWeights.Length));
-
-            Array.Copy(updateCounts, bestUpdateCounts, Math.Min(Size, updateCounts.Length));
+            bestUpdateCounts = Arrays.CopyOf(updateCounts, Size);
         }
 
         public void EndTraining()
         {
             if (bestWeights != null)
             {
-                sumWeights = new double[bestWeights.Length];
+                sumWeights = bestWeights;
 
-                Array.Copy(bestWeights, sumWeights, bestWeights.Length);
-
-                updateCounts = new int[bestUpdateCounts.Length];
-
-                Array.Copy(bestUpdateCounts, updateCounts, bestUpdateCounts.Length);
+                updateCounts = bestUpdateCounts;
             }
 
             bestWeights = null;
 
             bestUpdateCounts = null;
 
-            oldSumWeights = new double[Size];
-
-            Array.Copy(sumWeights, oldSumWeights, Math.Min(Size, sumWeights.Length));
+            oldSumWeights = Arrays.CopyOf(sumWeights, Size);
 
             PruneFeatures();
 

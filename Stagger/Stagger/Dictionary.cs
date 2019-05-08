@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -23,10 +24,7 @@ namespace Stagger
             {
                 string[] fields = line.Split('\t');
 
-                if (!(fields.Length >= 2))
-                {
-                    throw new Exception("Invalid number of fields.");
-                }
+                Debug.Assert(fields.Length == 2);
 
                 Map[fields[0].ToLower()] = fields[1];
             }

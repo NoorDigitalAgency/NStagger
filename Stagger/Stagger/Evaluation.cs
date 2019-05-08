@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace Stagger
 {
@@ -27,48 +28,45 @@ namespace Stagger
             NeFound = 0;
         }
 
-        public void Evaluate(TaggedToken[] sent, TaggedToken[] goldSent)
+        public void Evaluate(TaggedToken[] sentence, TaggedToken[] goldSentence)
         {
-            if (sent.Length != goldSent.Length)
-            {
-                throw new Exception("Length of the Sentence and Gold Sentence are different.");
-            }
+            Debug.Assert(sentence.Length == goldSentence.Length);
 
-            for (int i = 0; i < sent.Length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
-                if (sent[i].PosTag >= 0 && goldSent[i].PosTag >= 0)
+                if (sentence[i].PosTag >= 0 && goldSentence[i].PosTag >= 0)
                 {
                     PosTotal++;
 
-                    if (sent[i].PosTag == goldSent[i].PosTag)
+                    if (sentence[i].PosTag == goldSentence[i].PosTag)
                     {
                         PosCorrect++;
                     }
                 }
 
-                if (goldSent[i].NeTag == TaggedData.NeB)
+                if (goldSentence[i].NeTag == TaggedData.NeB)
                 {
                     NeTotal++;
                 }
 
-                if (sent[i].NeTag == TaggedData.NeB)
+                if (sentence[i].NeTag == TaggedData.NeB)
                 {
                     NeFound++;
 
-                    if (goldSent[i].NeTag == TaggedData.NeB && goldSent[i].NeTypeTag == sent[i].NeTypeTag)
+                    if (goldSentence[i].NeTag == TaggedData.NeB && goldSentence[i].NeTypeTag == sentence[i].NeTypeTag)
                     {
-                        for (int j = i + 1; j < sent.Length; j++)
+                        for (int j = i + 1; j < sentence.Length; j++)
                         {
-                            if (goldSent[i].NeTag != TaggedData.NeI)
+                            if (goldSentence[i].NeTag != TaggedData.NeI)
                             {
-                                if (sent[i].NeTag != TaggedData.NeI)
+                                if (sentence[i].NeTag != TaggedData.NeI)
                                 {
                                     NeCorrect++;
                                 }
 
                                 break;
                             }
-                            else if (sent[i].NeTag != TaggedData.NeI)
+                            else if (sentence[i].NeTag != TaggedData.NeI)
                             {
                                 break;
                             }
@@ -93,7 +91,7 @@ namespace Stagger
             return NeTotal == 0 ? 0.0 : NeCorrect / (double)NeTotal;
         }
 
-        public double GetNeScore()
+        public double GetNeFScore()
         {
             double precision = GetNePrecision();
 
@@ -102,21 +100,18 @@ namespace Stagger
             return Math.Abs(precision) < double.Epsilon && Math.Abs(recall) < double.Epsilon ? 0.0 : 2.0 * precision * recall / (precision + recall);
         }
 
-        public bool AreNesEqual(TaggedToken[] sent, TaggedToken[] goldSent)
+        public bool CheckNesEqual(TaggedToken[] sentence, TaggedToken[] goldSentence)
         {
-            if (sent.Length != goldSent.Length)
-            {
-                throw new Exception("Length of the Sentence and Gold Sentence are different.");
-            }
+            Debug.Assert(sentence.Length == goldSentence.Length);
 
-            for (int i = 0; i < sent.Length; i++)
+            for (int i = 0; i < sentence.Length; i++)
             {
-                if (sent[i].NeTag != goldSent[i].NeTag)
+                if (sentence[i].NeTag != goldSentence[i].NeTag)
                 {
                     return false;
                 }
 
-                if (sent[i].NeTypeTag != goldSent[i].NeTypeTag)
+                if (sentence[i].NeTypeTag != goldSentence[i].NeTypeTag)
                 {
                     return false;
                 }

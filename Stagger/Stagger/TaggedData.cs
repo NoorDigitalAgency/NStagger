@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -45,6 +46,7 @@ namespace Stagger
             }
             catch (TagNameException)
             {
+                Debug.Assert(false);
             }
         }
 
@@ -74,10 +76,7 @@ namespace Stagger
 
         public void WriteConllGold(StreamWriter writer, TaggedToken[] tokens, TaggedToken[] goldTokens, bool plain)
         {
-            if (tokens.Length != goldTokens.Length)
-            {
-                throw new Exception("Size of the Tokens Array and the Gold Token Array are not the same.");
-            }
+            Debug.Assert(tokens.Length == goldTokens.Length);
 
             for (int i = 0; i < tokens.Length; i++)
             {
