@@ -89,7 +89,7 @@ namespace Stagger
             return null;
         }
 
-        public void BuildLexicons(TaggedToken[][] sentences)
+        public virtual void BuildLexicons(TaggedToken[][] sentences)
         {
             const int types = (int)TokenType.Types;
 
