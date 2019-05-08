@@ -178,7 +178,7 @@ namespace Stagger
 
         /** this buffer contains the current text to be matched and is
             the source of the yytext() string */
-        private char zzBuffer[] = new char[ZZ_BUFFERSIZE];
+        private char[] zzBuffer = new char[ZZ_BUFFERSIZE];
 
         /** the textposition at the last accepting state */
         private int zzMarkedPos;
