@@ -110,9 +110,9 @@ namespace Stagger
 
         protected override void ComputeOpenTags()
         {
-            string[] names = TaggedData.PosTagSet.GetTagNames;
+            var names = TaggedData.PosTagSet.TagNames;
 
-            int[] tags = new int[names.Length];
+            int[] tags = new int[names.Count];
 
             string[] openTagArray = { "NN", "VB", "JJ", "AB", "PC", "RG", "RO", "PM", "UO", "LE" };
 
@@ -120,7 +120,7 @@ namespace Stagger
 
             int nTags = 0;
 
-            for (int i = 0; i < names.Length; i++)
+            for (int i = 0; i < names.Count; i++)
             {
                 if (openTagSet.Contains(names[i].Split('|')[0]))
                 {

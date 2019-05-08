@@ -8,7 +8,7 @@ namespace Stagger
     {
         protected Dictionary<string, int> TagIds;
 
-        protected List<string> TagNames;
+        public List<string> TagNames { get; }
 
         public TagSet()
         {
@@ -18,8 +18,6 @@ namespace Stagger
         }
 
         public int Size => TagNames.Count;
-
-        public string[] GetTagNames => TagNames.ToArray();
 
         public int GetTagId(string name)
         {
