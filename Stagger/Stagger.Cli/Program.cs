@@ -2,21 +2,21 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
 namespace Stagger.Cli
 {
     internal class Program
     {
-        /**
-     * Creates and returns a tokenizer for the given language.
-     */
         private static Tokenizer getTokenizer(TextReader reader, string lang)
         {
             Tokenizer tokenizer;
+
             if (lang.Equals("sv"))
             {
                 tokenizer = new SwedishTokenizer(reader);
@@ -36,11 +36,7 @@ namespace Stagger.Cli
             return tokenizer;
         }
 
-        /**
-         * Creates and returns a tagger for the given language.
-         */
-        private static Tagger getTagger(
-        string lang, TaggedData td, int posBeamSize, int neBeamSize)
+        private static Tagger getTagger(string lang, TaggedData td, int posBeamSize, int neBeamSize)
         {
             Tagger tagger = null;
             if (lang.Equals("sv"))
@@ -115,19 +111,7 @@ namespace Stagger.Cli
             return parts;
         }
 
-        /**
-         * Splits the sentences into training/development/test data sets.
-         *
-         * @param sents         array of sentences
-         * @param nFolds        number of folds in the experiment
-         * @param devPercent    size of development set in 1/10 percent
-         * @param testPercent   size of test set in 1/10 percent
-         * @param i             fold number (between 0 and nFolds-1, inclusive)
-         * @return              array with 3 TaggedToken[][] objects, containing
-         *                      the training, development and test sets
-         */
-        private static TaggedToken[][][] getFold(
-        TaggedToken[][] sents, int nFolds, int devPercent, int testPercent, int i)
+        private static TaggedToken[][][] getFold(TaggedToken[][] sents, int nFolds, int devPercent, int testPercent, int i)
         {
             int j, k;
             TaggedToken[][][] parts = new TaggedToken[3][][];
@@ -151,14 +135,15 @@ namespace Stagger.Cli
         private static TextReader openUTF8File(string name)
         {
             if (name.Equals("-"))
-                return new StreamReader(
-                    new InputStreamReader(System.in, "UTF-8"));
-            else if (name.EndsWith(".gz"))
-                return new StreamReader(new InputStreamReader(
-                            new GZIPInputStream(
-                                new FileInputStream(name)), "UTF-8"));
-            return new StreamReader(new InputStreamReader(
-                        new FileInputStream(name), "UTF-8"));
+            {
+                return new StreamReader(Console.OpenStandardInput(), Encoding.UTF8);
+            }
+
+            return name.EndsWith(".gz") ?
+                
+                new StreamReader(new GZipStream(new FileStream(name, FileMode.Open), CompressionMode.Decompress), Encoding.UTF8) :
+                
+                new StreamReader(new FileStream(name, FileMode.Open), Encoding.UTF8);
         }
 
         public static void Main(string[] args)
@@ -365,10 +350,8 @@ namespace Stagger.Cli
                     tagger.MaximumPosIterations = maxPosIters;
                     tagger.MaximumNeIterations = maxNEIters;
                     tagger.Train(trainSents, devSents);
-                    ObjectOutputStream writer = new ObjectOutputStream(
-                        new FileOutputStream(modelFile));
-                    writer.writeObject(tagger);
-                    writer.close();
+                    BinaryFormatter formatter = new BinaryFormatter();
+                    formatter.Serialize(new FileStream(modelFile, FileMode.Create), tagger);
                 }
                 else if (args[i].Equals("-cross"))
                 {
@@ -441,17 +424,15 @@ namespace Stagger.Cli
                         Environment.Exit(1);
                     }
 
-                    IPAddress serverIP = Dns.GetHostAddresses(args[++i]).FirstOrDefault();
+                    IPAddress serverIp = Dns.GetHostAddresses(args[++i]).FirstOrDefault();
                     int serverPort = int.Parse(args[++i]);
 
-                    ObjectInputStream modelReader = new ObjectInputStream(
-                        new FileInputStream(modelFile));
+                    BinaryFormatter formatter = new BinaryFormatter();
                     Console.WriteLine("Loading Stagger model ...");
-                    Tagger tagger = (Tagger)modelReader.readObject();
+                    Tagger tagger = (Tagger)formatter.Deserialize(new FileStream(modelFile, FileMode.Open));
                     lang = tagger.TaggedData.Language;
-                    modelReader.close();
 
-                    TcpListener ss = new TcpListener(serverIP, serverPort);
+                    TcpListener ss = new TcpListener(serverIp, serverPort);
                     ss.Start(4);
                     while (true)
                     {
@@ -479,9 +460,7 @@ namespace Stagger.Cli
                             }
                             StringReader reader = new StringReader(Encoding.UTF8.GetString(dataBuf));
 
-                            StreamWriter writer = new StreamWriter(
-                                new OutputStreamWriter(
-                                    sock.getOutputStream(), "UTF-8"));
+                            StreamWriter writer = new StreamWriter(ins, Encoding.UTF8);
 
                             Tokenizer tokenizer = getTokenizer(reader, lang);
                             List<Token> sentence;
@@ -550,12 +529,10 @@ namespace Stagger.Cli
                     }
                     TaggedToken[][] inputSents = null;
 
-                    ObjectInputStream modelReader = new ObjectInputStream(
-                        new FileInputStream(modelFile));
+                    BinaryFormatter formatter = new BinaryFormatter();
                     Console.WriteLine("Loading Stagger model ...");
-                    Tagger tagger = (Tagger)modelReader.readObject();
+                    Tagger tagger = (Tagger)formatter.Deserialize(new FileStream(modelFile, FileMode.Open));
                     lang = tagger.TaggedData.Language;
-                    modelReader.close();
 
                     // TODO: experimental feature, might remove later
                     tagger.ExtendLexicon = extendLexicon;
@@ -571,8 +548,7 @@ namespace Stagger.Cli
                                 !inputFile.EndsWith(".conll"));
                             Evaluation eval = new Evaluation();
                             int count = 0;
-                            StreamWriter writer = new StreamWriter(
-                                new OutputStreamWriter(Console.OpenStandardOutput(), "UTF-8"));
+                            StreamWriter writer = new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8);
                             foreach (TaggedToken[] sent in inputSents)
                             {
                                 if (count % 100 == 0)
@@ -608,15 +584,11 @@ namespace Stagger.Cli
                             {
                                 string outputFile = inputFile +
                                     (plainOutput ? ".plain" : ".conll");
-                                writer = new StreamWriter(
-                                                                new OutputStreamWriter(
-                                                                    new FileOutputStream(
-                                                                        outputFile), "UTF-8"));
+                                writer = new StreamWriter(new FileStream(outputFile, FileMode.Create), Encoding.UTF8);
                             }
                             else
                             {
-                                writer = new StreamWriter(
-                                    new OutputStreamWriter(Console.OpenStandardOutput(), "UTF-8"));
+                                writer = new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8);
                             }
                             Tokenizer tokenizer = getTokenizer(reader, lang);
                             List<Token> sentence;
