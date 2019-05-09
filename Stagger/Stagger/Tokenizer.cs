@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 
 namespace Stagger
 {
@@ -8,7 +9,7 @@ namespace Stagger
 
         public abstract void Close();
 
-        public abstract Token[] ReadSentence();
+        public abstract List<Token> ReadSentence();
 
         public abstract void Reset(StringReader reader);
 
