@@ -161,7 +161,7 @@ namespace Stagger
             }
         }
 
-        private StringReader reader;
+        private TextReader reader;
 
         private int state;
 
@@ -252,7 +252,7 @@ namespace Stagger
             return sentence.IsEmpty() ? null : sentence;
         }
 
-        public EnglishTokenizer(StringReader reader)
+        public EnglishTokenizer(TextReader reader)
         {
             this.reader = reader;
         }
@@ -353,7 +353,7 @@ namespace Stagger
         }
 
 
-        public override void Reset(StringReader newReader)
+        public override void Reset(TextReader newReader)
         {
             reader = newReader;
 

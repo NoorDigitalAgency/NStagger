@@ -17,7 +17,7 @@ namespace Stagger
 
         protected Perceptron NePerceptron;
 
-        protected TaggedData TaggedData { get; }
+        public TaggedData TaggedData { get; }
 
         protected int PosBeamSize;
 
@@ -35,23 +35,23 @@ namespace Stagger
 
         protected HashSet<string> AllowedSuffixes = null;
 
-        protected bool HasNe { get; set; }
+        public bool HasNe { get; set; }
 
-        protected Lexicon PosLexicon { get; }
+        public Lexicon PosLexicon { get; }
 
-        protected List<Dictionary> PosDictionaries { get; set; }
+        public List<Dictionary> PosDictionaries { get; set; }
 
-        protected List<Embedding> PosEmbeddings { get; set; }
+        public List<Embedding> PosEmbeddings { get; set; }
 
-        protected List<Dictionary> NeDictionaries { get; set; }
+        public List<Dictionary> NeDictionaries { get; set; }
 
-        protected List<Embedding> NeEmbeddings { get; set; }
+        public List<Embedding> NeEmbeddings { get; set; }
 
-        protected bool ExtendLexicon { get; set; } = true;
+        public bool ExtendLexicon { get; set; } = true;
 
-        protected int MaximumPosIterations { get; set; } = 16;
+        public int MaximumPosIterations { get; set; } = 16;
 
-        protected int MaximumNeIterations { get; set; } = 16;
+        public int MaximumNeIterations { get; set; } = 16;
 
         public Tagger(TaggedData taggedData, int posBeamSize, int neBeamSize)
         {

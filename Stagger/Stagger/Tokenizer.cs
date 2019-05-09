@@ -11,7 +11,7 @@ namespace Stagger
 
         public abstract List<Token> ReadSentence();
 
-        public abstract void Reset(StringReader reader);
+        public abstract void Reset(TextReader reader);
 
         public abstract int CharactersCount { get; protected set; }
 
