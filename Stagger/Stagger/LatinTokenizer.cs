@@ -2,12 +2,8 @@
 
 namespace Stagger
 {
-    public class LatinTokenizer : Tokenizer
+    public partial class LatinTokenizer : Tokenizer
     {
-        public LatinTokenizer(StringReader reader)
-        {
-        }
-
         public override Token Tokenize()
         {
             throw new System.NotImplementedException();

@@ -24,7 +24,7 @@
 
         Smiley = 10,
 
-        SentFinal = 11,
+        SentenceFinal = 11,
 
         Latin = 12,
 

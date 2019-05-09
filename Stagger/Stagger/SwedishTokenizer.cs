@@ -2,12 +2,8 @@
 
 namespace Stagger
 {
-    public class SwedishTokenizer:Tokenizer
+    public partial class SwedishTokenizer:Tokenizer
     {
-        public SwedishTokenizer(StringReader reader)
-        {
-        }
-
         public override Token Tokenize()
         {
             throw new System.NotImplementedException();
