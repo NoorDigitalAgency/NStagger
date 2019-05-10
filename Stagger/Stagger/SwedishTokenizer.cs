@@ -290,11 +290,6 @@ namespace Stagger
 
             int numRead = reader.Read(buffer, endRead, requested);
 
-            if (numRead == 0)
-            {
-                throw new Exception("Reader returned 0 characters. See JFlex examples for workaround.");
-            }
-
             if (numRead > 0)
             {
                 endRead += numRead;
@@ -429,7 +424,7 @@ namespace Stagger
                     {
                         input = Eof;
 
-                        break;
+                        goto AfterForAction;
                     }
                     else
                     {
@@ -451,7 +446,7 @@ namespace Stagger
                         {
                             input = Eof;
 
-                            break;
+                            goto AfterForAction;
                         }
                         else
                         {
@@ -465,7 +460,7 @@ namespace Stagger
 
                     if (next == -1)
                     {
-                        break;
+                        goto AfterForAction;
                     }
 
                     state = next;
@@ -480,10 +475,12 @@ namespace Stagger
 
                         if ((attributes & 8) == 8)
                         {
-                            break;
+                            goto AfterForAction;
                         }
                     }
                 }
+
+                AfterForAction:
 
                 markedPosition = markedPosLocal;
 

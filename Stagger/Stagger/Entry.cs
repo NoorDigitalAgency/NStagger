@@ -1,5 +1,8 @@
-﻿namespace Stagger
+﻿using System;
+
+namespace Stagger
 {
+    [Serializable]
     public class Entry
     {
         public Entry(string lemma, int tagId, int numberOfOccurence)

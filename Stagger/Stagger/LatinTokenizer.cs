@@ -4,6 +4,7 @@ using System.IO;
 
 namespace Stagger
 {
+    [Serializable]
     public partial class LatinTokenizer : Tokenizer
     {
         public const int Eof = -1;
@@ -293,11 +294,6 @@ namespace Stagger
             int requested = buffer.Length - endRead;
 
             int numRead = reader.Read(buffer, endRead, requested);
-
-            if (numRead == 0)
-            {
-                throw new Exception("Reader returned 0 characters. See JFlex examples for workaround.");
-            }
 
             if (numRead > 0)
             {

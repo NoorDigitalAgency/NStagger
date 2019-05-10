@@ -2,6 +2,7 @@
 
 namespace Stagger
 {
+    [Serializable]
     public class GenericTagger : Tagger
     {
         public GenericTagger(TaggedData taggedData, int posBeamSize, int neBeamSize) : base(taggedData, posBeamSize, neBeamSize)
@@ -26,11 +27,11 @@ namespace Stagger
 
         protected override void ComputeOpenTags()
         {
-            int nTags = TaggedData.PosTagSet.Size;
+            int tagsCount = TaggedData.PosTagSet.Size;
 
-            OpenTags = new int[nTags];
+            OpenTags = new int[tagsCount];
 
-            for (int i = 0; i < nTags; i++)
+            for (int i = 0; i < tagsCount; i++)
             {
                 OpenTags[i] = i;
             }

@@ -2,6 +2,7 @@
 
 namespace Stagger
 {
+    [Serializable]
     public class PTBTagger : Tagger
     {
         public PTBTagger(TaggedData taggedData, int posBeamSize, int neBeamSize) : base(taggedData, posBeamSize, neBeamSize)

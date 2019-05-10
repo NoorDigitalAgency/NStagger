@@ -5,6 +5,7 @@ using System.Linq;
 
 namespace Stagger
 {
+    [Serializable]
     public class Tagger
     {
         protected const int CountLimit = 3;
@@ -81,6 +82,7 @@ namespace Stagger
 
             PosLexicon = new Lexicon();
 
+            // ReSharper disable once VirtualMemberCallInConstructor
             ComputeOpenTags();
         }
 
@@ -1124,9 +1126,12 @@ namespace Stagger
 
                 for (int i = 0; i < PosEmbeddings.Count; i++)
                 {
-                    float[] value = PosEmbeddings[i].Map[textLower];
+                    if (!PosEmbeddings[i].Map.ContainsKey(textLower))
+                    {
+                        continue;
+                    }
 
-                    if (value == null) continue;
+                    float[] value = PosEmbeddings[i].Map[textLower];
 
                     head[2] = (char)i;
 
@@ -1246,7 +1251,7 @@ namespace Stagger
                 {
                     Dictionary dictionary = PosDictionaries[i];
 
-                    string nextValue = (i == sentence.Length - 1) ? null : dictionary.Map[nextText];
+                    string nextValue = (i == sentence.Length - 1) ? null : (dictionary.Map.ContainsKey(nextText) ? dictionary.Map[nextText] : null);
 
                     if (nextValue == null) continue;
 
@@ -1411,9 +1416,12 @@ namespace Stagger
 
             for (int i = 0; i < NeEmbeddings.Count; i++)
             {
-                float[] value = NeEmbeddings[i].Map[textLower];
+                if (!NeEmbeddings[i].Map.ContainsKey(textLower))
+                {
+                    continue;
+                }
 
-                if (value == null) continue;
+                float[] value = NeEmbeddings[i].Map[textLower];
 
                 head[3] = (char)i;
 

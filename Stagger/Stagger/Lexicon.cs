@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
 namespace Stagger
 {
+    [Serializable]
     public class Lexicon
     {
         private Dictionary<string, List<Entry>> lexicon;
@@ -24,13 +26,17 @@ namespace Stagger
         {
             string wordFormLower = wordForm.ToLower();
 
-            List<Entry> entries = lexicon[wordFormLower];
+            List<Entry> entries;
 
-            if (entries == null)
+            if (!lexicon.ContainsKey(wordFormLower))
             {
                 entries = new List<Entry>(4);
 
                 lexicon[wordFormLower] = entries;
+            }
+            else
+            {
+                entries = lexicon[wordFormLower];
             }
 
             AddEntry(entries, lemma, tagId, numberOfOccurence);
@@ -63,6 +69,11 @@ namespace Stagger
 
         public Entry[] GetEntries(string wordForm)
         {
+            if (!lexicon.ContainsKey(wordForm.ToLower()))
+            {
+                return null;
+            }
+
             List<Entry> entries = lexicon[wordForm.ToLower()];
 
             return entries?.ToArray();
@@ -70,13 +81,11 @@ namespace Stagger
 
         public int CountWordForm(string wordForm)
         {
-            List<Entry> entries = lexicon[wordForm.ToLower()];
-
-            if (entries == null) return 0;
+            if (!lexicon.ContainsKey(wordForm.ToLower())) return 0;
 
             int numberOfOccurence = 0;
 
-            foreach (Entry entry in entries)
+            foreach (Entry entry in lexicon[wordForm.ToLower()])
             {
                 numberOfOccurence += entry.NumberOfOccurence;
             }
@@ -137,39 +146,38 @@ namespace Stagger
                     {
                         entry2 = entry;
                     }
+                }
 
-                    if (entry1 == null && entry2 == null) continue;
+                if (entry1 == null && entry2 == null) continue;
 
-                    if (entry1 != null && entry2 != null) continue;
+                if (entry1 != null && entry2 != null) continue;
 
-                    bool hasSuffix = false;
+                bool hasSuffix = false;
 
-                    for (int i = 2; i < wordForm.Length; i++)
+                for (int i = 2; i < wordForm.Length; i++)
+                {
+                    if (suffixSet.Contains(wordForm.Substring(i)))
                     {
-                        if (suffixSet.Contains(wordForm.Substring(i)))
-                        {
-                            hasSuffix = true;
+                        hasSuffix = true;
 
-                            break;
-                        }
+                        break;
                     }
+                }
 
-                    if (!hasSuffix) continue;
+                if (!hasSuffix) continue;
 
-                    if (entry1 != null)
-                    {
-                        AddEntry(entries, entry1.Lemma, tagId2, 0);
-                    }
-                    else
-                    {
-                        AddEntry(entries, entry2.Lemma, tagId1, 0);
-                    }
+                if (entry1 != null)
+                {
+                    AddEntry(entries, entry1.Lemma, tagId2, 0);
+                }
+                else
+                {
+                    AddEntry(entries, entry2.Lemma, tagId1, 0);
                 }
             }
         }
 
         public void FromStreamReader(StreamReader reader, TagSet tagSet, bool extend)
-
         {
             string line;
 

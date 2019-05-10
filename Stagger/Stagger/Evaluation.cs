@@ -3,6 +3,7 @@ using System.Diagnostics;
 
 namespace Stagger
 {
+    [Serializable]
     public class Evaluation
     {
         public int PosTotal { get; private set; }

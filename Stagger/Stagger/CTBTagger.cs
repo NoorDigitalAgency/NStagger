@@ -2,6 +2,7 @@
 
 namespace Stagger
 {
+    [Serializable]
     public class CTBTagger : Tagger
     {
         private readonly string[] openTagArray = { "VA", "VC", "VE", "VV", "NR", "NT", "NN", "AD", "FW", "CD", "OD", "IJ", "JJ" };
@@ -195,9 +196,12 @@ namespace Stagger
 
                 for (int i = 0; i < PosEmbeddings.Count; i++)
                 {
-                    float[] value = PosEmbeddings[i].Map[textLower];
+                    if (!PosEmbeddings[i].Map.ContainsKey(textLower))
+                    {
+                        continue;
+                    }
 
-                    if (value == null) continue;
+                    float[] value = PosEmbeddings[i].Map[textLower];
 
                     head[2] = (char)i;
 

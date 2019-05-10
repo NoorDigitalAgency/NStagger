@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Stagger
 {
+    [Serializable]
     public class SUCTagger : Tagger
     {
         public SUCTagger(TaggedData taggedData, int posBeamSize, int neBeamSize) : base(taggedData, posBeamSize, neBeamSize)
@@ -110,7 +112,7 @@ namespace Stagger
 
         protected override void ComputeOpenTags()
         {
-            var names = TaggedData.PosTagSet.TagNames;
+            List<string> names = TaggedData.PosTagSet.TagNames;
 
             int[] tags = new int[names.Count];
 
@@ -118,19 +120,19 @@ namespace Stagger
 
             HashSet<string> openTagSet = new HashSet<string>(openTagArray);
 
-            int nTags = 0;
+            int tagsCount = 0;
 
             for (int i = 0; i < names.Count; i++)
             {
                 if (openTagSet.Contains(names[i].Split('|')[0]))
                 {
-                    tags[nTags++] = i;
+                    tags[tagsCount++] = i;
                 }
             }
 
-            Debug.Assert(nTags > 0);
+            Debug.Assert(tagsCount > 0);
 
-            OpenTags = Arrays.CopyOf(tags, nTags);
+            OpenTags = Arrays.CopyOf(tags, tagsCount);
         }
     }
 }
