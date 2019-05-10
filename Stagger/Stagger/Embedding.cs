@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Stagger
@@ -67,12 +68,7 @@ namespace Stagger
             {
                 t0 += values.Length;
 
-                foreach (float value in values)
-                {
-                    double d = value - avg;
-
-                    t2 += d * d;
-                }
+                t2 += values.Select(value => value - avg).Select(d => d * d).Sum();
             }
 
             double variance = t2 / t0;
