@@ -416,7 +416,7 @@ namespace Stagger.Cli
 
                     Lexicon lexicon = tagger.PosLexicon;
 
-                    Console.WriteLine($"POS lexicon size (corpus) '{lexicon.Size}'.");
+                    Console.WriteLine($"POS lexicon size (corpus) {lexicon.Size}.");
 
                     if (lexiconFile != null)
                     {
@@ -424,7 +424,7 @@ namespace Stagger.Cli
 
                         lexicon.FromFile(lexiconFile, taggedData.PosTagSet, extendLexicon);
 
-                        Console.WriteLine($"POS lexicon size (external) '{lexicon.Size}'.");
+                        Console.WriteLine($"POS lexicon size (external) {lexicon.Size}.");
                     }
 
                     tagger.PosDictionaries = posDictionaries;
@@ -528,92 +528,112 @@ namespace Stagger.Cli
                     int serverPort = int.Parse(args[++i]);
 
                     BinaryFormatter formatter = new BinaryFormatter();
+
                     Console.WriteLine("Loading Stagger model ...");
-                    Tagger tagger = (Tagger) formatter.Deserialize(new FileStream(modelFile, FileMode.Open));
+
+                    Tagger tagger = (Tagger)formatter.Deserialize(new FileStream(modelFile, FileMode.Open));
+
                     language = tagger.TaggedData.Language;
 
-                    TcpListener ss = new TcpListener(serverIp, serverPort);
-                    ss.Start(4);
+                    TcpListener tcpListener = new TcpListener(serverIp, serverPort);
+
+                    tcpListener.Start(4);
+
                     while (true)
                     {
                         Socket sock = null;
+
                         try
                         {
-                            sock = ss.AcceptSocket();
-                            Console.WriteLine("Connected to " +
-                                              sock.RemoteEndPoint);
-                            NetworkStream ins = new NetworkStream(sock);
-                            byte[] lenBuf = new byte[4];
-                            if (ins.Read(lenBuf) != 4)
+                            sock = tcpListener.AcceptSocket();
+
+                            Console.WriteLine($"Connected to {sock.RemoteEndPoint}");
+
+                            NetworkStream networkStream = new NetworkStream(sock);
+
+                            byte[] lengthBuffer = new byte[4];
+
+                            if (networkStream.Read(lengthBuffer) != 4)
                             {
                                 throw new IOException("Can not read length.");
                             }
 
-                            int len = BitConverter.ToInt32(lenBuf);
-                            if (len < 1 || len > 100000)
+                            int length = BitConverter.ToInt32(lengthBuffer);
+
+                            if (length < 1 || length > 100000)
                             {
-                                throw new IOException("Invalid data size: " + len);
+                                throw new IOException($"Invalid data size {length}.");
                             }
 
-                            byte[] dataBuf = new byte[len];
-                            if (ins.Read(dataBuf) != len)
+                            byte[] dataBuf = new byte[length];
+                            if (networkStream.Read(dataBuf) != length)
                             {
                                 throw new IOException("Can not read data.");
                             }
 
                             StringReader reader = new StringReader(Encoding.UTF8.GetString(dataBuf));
 
-                            StreamWriter writer = new StreamWriter(ins, Encoding.UTF8);
+                            StreamWriter writer = new StreamWriter(networkStream, Encoding.UTF8);
 
                             Tokenizer tokenizer = GetTokenizer(reader, language);
+
                             List<Token> sentence;
-                            int sentIdx = 0;
-                            string fileID = "net";
+
+                            int sentenceIndex = 0;
+
+                            string fileId = "net";
+
                             while ((sentence = tokenizer.ReadSentence()) != null)
                             {
-                                TaggedToken[] sent =
-                                    new TaggedToken[sentence.Count];
+                                TaggedToken[] taggedSentence = new TaggedToken[sentence.Count];
+
                                 if (tokenizer.SentenceId != null)
                                 {
-                                    if (!fileID.Equals(tokenizer.SentenceId))
+                                    if (!fileId.Equals(tokenizer.SentenceId))
                                     {
-                                        fileID = tokenizer.SentenceId;
-                                        sentIdx = 0;
+                                        fileId = tokenizer.SentenceId;
+
+                                        sentenceIndex = 0;
                                     }
                                 }
 
                                 for (int j = 0; j < sentence.Count; j++)
                                 {
-                                    Token tok = sentence[j];
-                                    string id;
-                                    id = fileID + ":" + sentIdx + ":" + tok.Offset;
-                                    sent[j] = new TaggedToken(tok, id);
+                                    Token token = sentence[j];
+
+                                    var id = $"{fileId}:{sentenceIndex}:{token.Offset}";
+
+                                    taggedSentence[j] = new TaggedToken(token, id);
                                 }
 
-                                TaggedToken[] taggedSent =
-                                    tagger.TagSentence(sent, true, false);
-                                tagger.TaggedData.WriteConllSentence(
-                                    (writer == null) ? new StreamWriter(Console.OpenStandardOutput()) : writer,
-                                    taggedSent, plainOutput);
-                                sentIdx++;
+                                TaggedToken[] taggedSent = tagger.TagSentence(taggedSentence, true, false);
+
+                                tagger.TaggedData.WriteConllSentence(writer ?? new StreamWriter(Console.OpenStandardOutput()), taggedSent, plainOutput);
+
+                                sentenceIndex++;
                             }
 
                             tokenizer.Close();
+
                             if (sock.Connected)
                             {
-                                Console.WriteLine("Closing connection to " +
-                                                  sock.RemoteEndPoint);
+                                Console.WriteLine($"Closing connection to {sock.RemoteEndPoint}.");
+
                                 writer.Close();
                             }
                         }
                         catch (IOException e)
                         {
                             Console.WriteLine(e.StackTrace);
+
                             if (sock != null)
                             {
-                                Console.WriteLine("Connection failed to " +
-                                                  sock.RemoteEndPoint);
-                                if (sock.Connected) sock.Close();
+                                Console.WriteLine($"Connection failed to {sock.RemoteEndPoint}.");
+
+                                if (sock.Connected)
+                                {
+                                    sock.Close();
+                                }
                             }
                         }
                     }
@@ -623,76 +643,91 @@ namespace Stagger.Cli
                     if (modelFile == null || i >= args.Length - 1)
                     {
                         Console.WriteLine("Insufficient data.");
+
                         Environment.Exit(1);
                     }
 
                     List<string> inputFiles = new List<string>();
+
                     for (i++; i < args.Length && !args[i].StartsWith("-"); i++)
+                    {
                         inputFiles.Add(args[i]);
+                    }
+
                     if (inputFiles.Count < 1)
                     {
                         Console.WriteLine("No files to tag.");
+
                         Environment.Exit(1);
                     }
 
-                    TaggedToken[][] inputSents = null;
-
                     BinaryFormatter formatter = new BinaryFormatter();
+
                     Console.WriteLine("Loading Stagger model ...");
-                    Tagger tagger = (Tagger) formatter.Deserialize(new FileStream(modelFile, FileMode.Open));
+
+                    Tagger tagger = (Tagger)formatter.Deserialize(new FileStream(modelFile, FileMode.Open));
+
                     language = tagger.TaggedData.Language;
 
-                    // TODO: experimental feature, might remove later
                     tagger.ExtendLexicon = extendLexicon;
-                    if (!hasNe) tagger.HasNe = false;
+
+                    if (!hasNe)
+                    {
+                        tagger.HasNe = false;
+                    }
 
                     foreach (string inputFile in inputFiles)
                     {
-                        if (!(inputFile.EndsWith(".txt") ||
-                              inputFile.EndsWith(".txt.gz")))
+                        if (!(inputFile.EndsWith(".txt") || inputFile.EndsWith(".txt.gz")))
                         {
-                            inputSents = tagger.TaggedData.ReadConll(
-                                inputFile, null, true,
-                                !inputFile.EndsWith(".conll"));
-                            Evaluation eval = new Evaluation();
+                            TaggedToken[][] inputSentence = tagger.TaggedData.ReadConll(inputFile, null, true, !inputFile.EndsWith(".conll"));
+
+                            Evaluation evaluation = new Evaluation();
+
                             int count = 0;
+
                             StreamWriter writer = new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8);
-                            foreach (TaggedToken[] sent in inputSents)
+
+                            foreach (TaggedToken[] sentence in inputSentence)
                             {
                                 if (count % 100 == 0)
-                                    Console.WriteLine("Tagging sentence nr: " +
-                                                      count + "\r");
-                                count++;
-                                TaggedToken[] taggedSent =
-                                    tagger.TagSentence(sent, true, preserve);
+                                {
+                                    Console.WriteLine($"Tagging sentence number {count}.\r");
+                                }
 
-                                eval.Evaluate(taggedSent, sent);
-                                tagger.TaggedData.WriteConllGold(
-                                    writer, taggedSent, sent, plainOutput);
+                                count++;
+
+                                TaggedToken[] taggedSentence = tagger.TagSentence(sentence, true, preserve);
+
+                                evaluation.Evaluate(taggedSentence, sentence);
+
+                                tagger.TaggedData.WriteConllGold(writer, taggedSentence, sentence, plainOutput);
                             }
 
                             writer.Close();
-                            Console.WriteLine("Tagging sentence nr: " + count);
-                            Console.WriteLine(
-                                "POS accuracy: " + eval.GetPosAccuracy() +
-                                " (" + eval.PosCorrect + " / " +
-                                eval.PosTotal + ")");
-                            Console.WriteLine(
-                                "NE precision: " + eval.GetNePrecision());
-                            Console.WriteLine(
-                                "NE recall:    " + eval.GetNeRecall());
-                            Console.WriteLine(
-                                "NE F-score:   " + eval.GetNeFScore());
+
+                            Console.WriteLine($"Tagging sentence number {count}.");
+
+                            Console.WriteLine($"POS accuracy: {evaluation.GetPosAccuracy()} ({evaluation.PosCorrect} / {evaluation.PosTotal}).");
+
+                            Console.WriteLine($"NE precision: {evaluation.GetNePrecision()}.");
+
+                            Console.WriteLine($"NE recall:    {evaluation.GetNeRecall()}.");
+
+                            Console.WriteLine($"NE F-score:   {evaluation.GetNeFScore()}.");
                         }
                         else
                         {
-                            string fileID = Path.GetFileNameWithoutExtension(inputFile);
+                            string fileId = Path.GetFileNameWithoutExtension(inputFile);
+
                             TextReader reader = OpenUtf8File(inputFile);
+
                             StreamWriter writer;
+
                             if (inputFiles.Count > 1)
                             {
-                                string outputFile = inputFile +
-                                                    (plainOutput ? ".plain" : ".conll");
+                                string outputFile = $"{inputFile}{(plainOutput ? ".plain" : ".conll")}";
+
                                 writer = new StreamWriter(new FileStream(outputFile, FileMode.Create), Encoding.UTF8);
                             }
                             else
@@ -701,60 +736,71 @@ namespace Stagger.Cli
                             }
 
                             Tokenizer tokenizer = GetTokenizer(reader, language);
+
                             List<Token> sentence;
-                            int sentIdx = 0;
+
+                            int sentenceIndex = 0;
+
                             while ((sentence = tokenizer.ReadSentence()) != null)
                             {
-                                TaggedToken[] sent =
-                                    new TaggedToken[sentence.Count];
+                                TaggedToken[] sent = new TaggedToken[sentence.Count];
+
                                 if (tokenizer.SentenceId != null)
                                 {
-                                    if (!fileID.Equals(tokenizer.SentenceId))
+                                    if (!fileId.Equals(tokenizer.SentenceId))
                                     {
-                                        fileID = tokenizer.SentenceId;
-                                        sentIdx = 0;
+                                        fileId = tokenizer.SentenceId;
+
+                                        sentenceIndex = 0;
                                     }
                                 }
 
                                 for (int j = 0; j < sentence.Count; j++)
                                 {
                                     Token tok = sentence[j];
-                                    var id = fileID + ":" + sentIdx + ":" +
-                                             tok.Offset;
+
+                                    var id = $"{fileId}:{sentenceIndex}:{tok.Offset}";
+
                                     sent[j] = new TaggedToken(tok, id);
                                 }
 
-                                TaggedToken[] taggedSent =
-                                    tagger.TagSentence(sent, true, false);
-                                tagger.TaggedData.WriteConllSentence(
-                                    (writer == null) ? new StreamWriter(Console.OpenStandardOutput()) : writer,
-                                    taggedSent, plainOutput);
-                                sentIdx++;
+                                TaggedToken[] taggedSent = tagger.TagSentence(sent, true, false);
+
+                                tagger.TaggedData.WriteConllSentence(writer ?? new StreamWriter(Console.OpenStandardOutput()), taggedSent, plainOutput);
+
+                                sentenceIndex++;
                             }
 
                             tokenizer.Close();
-                            if (writer != null) writer.Close();
+
+                            writer?.Close();
                         }
                     }
                 }
                 else if (args[i].Equals("-tokenize"))
                 {
                     string inputFile = args[++i];
+
                     TextReader reader = OpenUtf8File(inputFile);
+
                     Tokenizer tokenizer = GetTokenizer(reader, language);
+
                     List<Token> sentence;
+
                     while ((sentence = tokenizer.ReadSentence()) != null)
                     {
-                        if (sentence.Count == 0) continue;
+                        if (sentence.Count == 0)
+                        {
+                            continue;
+                        }
+
                         if (!plainOutput)
                         {
-                            Console.Write(
-                                sentence[0].Value.Replace(' ', '_'));
+                            Console.Write(sentence[0].Value.Replace(' ', '_'));
+
                             for (int j = 1; j < sentence.Count; j++)
                             {
-                                Console.Write(
-                                    " " +
-                                    sentence[j].Value.Replace(' ', '_'));
+                                Console.Write($" {sentence[j].Value.Replace(' ', '_')}");
                             }
 
                             Console.WriteLine("");
