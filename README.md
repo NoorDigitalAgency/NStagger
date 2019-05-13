@@ -1,5 +1,5 @@
-# Stagger
-Stagger – The Stockholm Tagger in C#
+# NStagger
+NStagger – The .NET Stockholm Tagger
 
 Stagger is a Swedish part-of-speech tagger based on Collins (2002) averaged perceptron. Per-token accuracy is about 96.6 percent (10-fold cross validation on SUC 3.0), which compares favorably to other published results for Swedish.
 
