@@ -10,7 +10,7 @@ namespace NStagger
     [Serializable]
     public class Embedding
     {
-        public Dictionary<string, float[]> Map;
+        public Dictionary<string, float[]> Map { get; }
 
         public Embedding()
         {

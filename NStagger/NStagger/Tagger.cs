@@ -10,6 +10,10 @@ namespace NStagger
     {
         protected const int CountLimit = 3;
 
+        protected const int MaximumFeatures = 0x80;
+
+        protected const int AccumulateLimit = 0x1000;
+
         protected bool TrainingMode;
 
         protected int[][] TokenTypeTags;
@@ -17,8 +21,6 @@ namespace NStagger
         protected Perceptron PosPerceptron;
 
         protected Perceptron NePerceptron;
-
-        public TaggedData TaggedData { get; }
 
         protected int PosBeamSize;
 
@@ -28,13 +30,11 @@ namespace NStagger
 
         protected bool HasPos;
 
-        protected const int MaximumFeatures = 0x80;
-
-        protected const int AccumulateLimit = 0x1000;
-
         protected HashSet<string> AllowedPrefixes = null;
 
         protected HashSet<string> AllowedSuffixes = null;
+
+        public TaggedData TaggedData { get; }
 
         public bool HasNe { get; set; }
 
