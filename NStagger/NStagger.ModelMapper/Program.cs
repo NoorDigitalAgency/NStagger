@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Xml.Serialization;
 using java.io;
 
 namespace NStagger.ModelMapper
@@ -13,6 +14,10 @@ namespace NStagger.ModelMapper
             se.su.ling.stagger.SUCTagger stagger = (se.su.ling.stagger.SUCTagger)modelReader.readObject();
 
             SUCTagger sucTagger = Mapper.Map<SUCTagger>(stagger);
+
+            XmlSerializer serializer = new XmlSerializer(typeof(SUCTagger));
+
+            serializer.Serialize(new StreamWriter(new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.xnb", FileMode.Create)), sucTagger);
 
             BinaryFormatter formatter = new BinaryFormatter();
 
