@@ -78,7 +78,9 @@ namespace NStagger.ModelMapper
 
         private static Perceptron MapPerceptron(object obj, string fieldName)
         {
-            return obj.MapTo<Perceptron>(fieldName, new Dictionary<string, string> {
+            object value = obj.GetFieldValue(fieldName);
+
+            Perceptron perceptron = obj.MapTo<Perceptron>(fieldName, new Dictionary<string, string> {
 
                 { "sumWeight", "sumWeights"},
 
@@ -92,6 +94,13 @@ namespace NStagger.ModelMapper
 
                 {"bestUpdateCount", "bestUpdateCounts"}
             });
+
+            if (value != null)
+            {
+                perceptron.SetFieldValue(MapHashSet(value, "featMap"), "featureMap");
+            }
+
+            return perceptron;
         }
 
         private static TaggedData MapTaggedData(object obj, string fieldName)
@@ -247,6 +256,15 @@ namespace NStagger.ModelMapper
             }
 
             return null;
+        }
+
+        private static Dictionary<string,int> MapHashSet(object obj, string fieldName)
+        {
+            object value = obj.GetFieldValue(fieldName);
+
+            HashMap hashMap = (HashMap) value;
+
+            return hashMap?.Cast<DictionaryEntry>().ToDictionary(entry => (string)entry.Key, entry => entry.Value is Integer floats ? floats.intValue() : (int)entry.Value);
         }
     }
 }

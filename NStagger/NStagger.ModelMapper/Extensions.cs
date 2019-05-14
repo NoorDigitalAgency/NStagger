@@ -12,7 +12,13 @@ namespace NStagger.ModelMapper
 
         public static object GetFieldValue(this object obj, string fieldName)
         {
-            return obj.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(obj);
+            return (obj.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
+                    
+                    obj.GetType().GetField($"__<>{fieldName}", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
+
+                    obj.GetType().BaseType?.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
+                    
+                    obj.GetType().BaseType?.GetField($"__<>{fieldName}", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))?.GetValue(obj);
         }
 
         public static void SetFieldValue(this object destination, object source, string sourceFieldName, string destinationFieldName)
