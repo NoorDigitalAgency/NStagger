@@ -1,7 +1,7 @@
-﻿using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Xml.Serialization;
+﻿using System;
+using System.Runtime.InteropServices;
 using java.io;
+using File = System.IO.File;
 
 namespace NStagger.ModelMapper
 {
@@ -15,13 +15,22 @@ namespace NStagger.ModelMapper
 
             SUCTagger sucTagger = Mapper.Map<SUCTagger>(stagger);
 
-            XmlSerializer serializer = new XmlSerializer(typeof(SUCTagger));
+            var size = Marshal.SizeOf(sucTagger);
+            // Both managed and unmanaged buffers required.
+            byte[] bytes = new byte[size];
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            // Copy object byte-to-byte to unmanaged memory.
+            Marshal.StructureToPtr(sucTagger, ptr, false);
+            // Copy data from unmanaged memory to managed buffer.
+            Marshal.Copy(ptr, bytes, 0, size);
+            // Release unmanaged memory.
+            Marshal.FreeHGlobal(ptr);
 
-            serializer.Serialize(new StreamWriter(new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.xnb", FileMode.Create)), sucTagger);
+            File.WriteAllBytes(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nbin", bytes);
 
-            BinaryFormatter formatter = new BinaryFormatter();
+            //BinaryFormatter formatter = new BinaryFormatter();
 
-            formatter.Serialize(new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nbin", FileMode.Create), sucTagger);
+            //formatter.Serialize(new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nbin", FileMode.Create), sucTagger);
         }
     }
 }
