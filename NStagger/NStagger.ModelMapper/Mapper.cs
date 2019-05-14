@@ -16,7 +16,7 @@ namespace NStagger.ModelMapper
 
             output.SetFieldValue(stagger, "trainingMode", "TrainingMode");
 
-            output.SetFieldValue(stagger, "tokTypeTags", "TokenTypeTags");//+
+            output.SetFieldValue(stagger, "tokTypeTags", "TokenTypeTags");
 
             output.SetFieldValue(MapPerceptron(stagger, "posPerceptron"), "PosPerceptron");
 
@@ -26,7 +26,7 @@ namespace NStagger.ModelMapper
 
             output.SetFieldValue(stagger, "neBeamSize", "NeBeamSize");
 
-            output.SetFieldValue(stagger, "openTags", "OpenTags");//+
+            output.SetFieldValue(stagger, "openTags", "OpenTags");
 
             output.SetFieldValue(stagger, "hasPos", "HasPos");
 
@@ -135,15 +135,15 @@ namespace NStagger.ModelMapper
 
                 HashMap tagId = (HashMap)value.GetFieldValue("tagID");
 
-                Dictionary<string, int> tagIds = tagId?.Cast<DictionaryEntry>().ToDictionary(entry => (string)entry.Key, entry => entry.Value is Integer integer ? ((Integer)entry.Value).intValue() : (int)entry.Value);
+                Dictionary<string, int> tagIds = tagId?.Cast<DictionaryEntry>().ToDictionary(entry => (string)entry.Key, entry => entry.Value is Integer integer ? integer.intValue() : (int)entry.Value);
 
-                ArrayList tagName = (ArrayList)tagSet.GetFieldValue("tagName");
+                ArrayList tagName = (ArrayList)value.GetFieldValue("tagName");
 
                 List<string> tagNames = tagName?.Cast<string>().ToList();
 
                 tagSet.SetFieldValue(tagIds, "TagIds");
 
-                tagSet.SetFieldValue(tagNames, "TagNames");
+                tagSet.SetProperty(tagNames, "TagNames");
 
                 return tagSet;
             }

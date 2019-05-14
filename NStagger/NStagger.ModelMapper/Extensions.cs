@@ -7,7 +7,9 @@ namespace NStagger.ModelMapper
     {
         public static void SetFieldValue(this object obj, object value, string fieldName)
         {
-            obj.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.SetValue(obj, value);
+            (obj.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
+
+             obj.GetType().BaseType?.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))?.SetValue(obj, value);
         }
 
         public static object GetFieldValue(this object obj, string fieldName)
@@ -23,21 +25,27 @@ namespace NStagger.ModelMapper
 
         public static void SetFieldValue(this object destination, object source, string sourceFieldName, string destinationFieldName)
         {
-            object value = source.GetType().GetField(sourceFieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(source);
+            object value = source.GetFieldValue(sourceFieldName);
 
-            destination.GetType().GetField(destinationFieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.SetValue(destination, value);
+            (destination.GetType().GetField(destinationFieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
+
+             destination.GetType().BaseType?.GetField(destinationFieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))?.SetValue(destination, value);
         }
 
         public static void SetPropertyFromField(this object destination, object source, string fieldName, string propertyName)
         {
-            PropertyInfo propertyInfo = destination.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            PropertyInfo propertyInfo = (destination.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) ??
+
+                                         destination.GetType().BaseType?.GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
             destination.SetFieldValue(source, fieldName, propertyInfo.GetBackingField().Name);
         }
 
         public static void SetProperty(this object obj, object value, string propertyName)
         {
-            PropertyInfo propertyInfo = obj.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            PropertyInfo propertyInfo = (obj.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) ??
+
+                                         obj.GetType().BaseType?.GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
             obj.SetFieldValue(value, propertyInfo.GetBackingField().Name);
         }
@@ -49,7 +57,7 @@ namespace NStagger.ModelMapper
                 return null;
             }
 
-            FieldInfo backingField = propertyInfo.DeclaringType?.GetField($"<{propertyInfo.Name}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo backingField = (propertyInfo.DeclaringType ?? propertyInfo.DeclaringType?.BaseType)?.GetField($"<{propertyInfo.Name}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
 
             if (backingField == null)
             {

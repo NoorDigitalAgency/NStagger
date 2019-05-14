@@ -8,7 +8,7 @@ namespace NStagger.ModelMapper
     {
         private static void Main(string[] args)
         {
-            ObjectInputStream modelReader = new ObjectInputStream(new FileInputStream(@"C:\Users\Rojan\Desktop\swedish.bin\t.bin"));
+            ObjectInputStream modelReader = new ObjectInputStream(new FileInputStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.bin"));
 
             se.su.ling.stagger.SUCTagger stagger = (se.su.ling.stagger.SUCTagger)modelReader.readObject();
 
