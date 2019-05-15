@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NStagger.ModelMapper
+namespace NStagger.Model
 {
     [Serializable]
     public class Container

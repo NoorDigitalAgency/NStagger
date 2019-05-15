@@ -69,7 +69,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Container.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Mapper.cs" />
     <Compile Include="Program.cs" />
@@ -80,6 +79,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\NStagger.Model\NStagger.Model.csproj">
+      <Project>{dc0dd04b-b503-44d7-8af0-809c1af72df2}</Project>
+      <Name>NStagger.Model</Name>
+    </ProjectReference>
     <ProjectReference Include="..\NStagger\NStagger.csproj">
       <Project>{aa21fe00-693e-464c-b820-13e0ad76b085}</Project>
       <Name>NStagger</Name>

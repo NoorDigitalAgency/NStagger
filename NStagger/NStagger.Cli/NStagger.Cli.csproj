@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NStagger.Model\NStagger.Model.csproj" />
     <ProjectReference Include="..\NStagger\NStagger.csproj" />
   </ItemGroup>
 
