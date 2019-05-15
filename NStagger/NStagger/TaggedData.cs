@@ -54,7 +54,7 @@ namespace NStagger
         {
             foreach (TaggedToken[] sentence in sentences)
             {
-                for (int i = 0; i < sentences.Length; i++)
+                for (int i = 0; i < sentence.Length; i++)
                 {
                     TaggedToken token = sentence[i];
 
