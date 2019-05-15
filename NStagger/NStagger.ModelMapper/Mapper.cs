@@ -1,7 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 using java.lang;
 using java.util;
 using ArrayList = java.util.ArrayList;
@@ -10,51 +13,139 @@ namespace NStagger.ModelMapper
 {
     public static class Mapper
     {
-        public static T Map<T>(object stagger)
+        private static readonly BinaryFormatter formatter = new BinaryFormatter();
+
+        private static FileStream fileStream;
+
+        public static void Map<T>(object stagger)
         {
+            fileStream = new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nbin", FileMode.Create);
+
             T output = (T)FormatterServices.GetSafeUninitializedObject(typeof(T));
 
-            output.SetFieldValue(stagger, "trainingMode", "TrainingMode");
+            output.SetFieldValue(Write(stagger.GetFieldValue("trainingMode"), "trainingMode"), "TrainingMode");
 
-            output.SetFieldValue(stagger, "tokTypeTags", "TokenTypeTags");
+            output.SetFieldValue(Write(stagger.GetFieldValue("tokTypeTags"), "tokTypeTags"), "TokenTypeTags");
 
-            output.SetFieldValue(MapPerceptron(stagger, "posPerceptron"), "PosPerceptron");
+            output.SetFieldValue(Write(MapPerceptron(stagger, "posPerceptron"), "posPerceptron"), "PosPerceptron");
 
-            output.SetFieldValue(MapPerceptron(stagger, "nePerceptron"), "NePerceptron");
+            output.SetFieldValue(Write(MapPerceptron(stagger, "nePerceptron"), "nePerceptron"), "NePerceptron");
 
-            output.SetFieldValue(stagger, "posBeamSize", "PosBeamSize");
+            output.SetFieldValue(Write(stagger.GetFieldValue("posBeamSize"), "posBeamSize"), "PosBeamSize");
 
-            output.SetFieldValue(stagger, "neBeamSize", "NeBeamSize");
+            output.SetFieldValue(Write(stagger.GetFieldValue("neBeamSize"), "neBeamSize"), "NeBeamSize");
 
-            output.SetFieldValue(stagger, "openTags", "OpenTags");
+            output.SetFieldValue(Write(stagger.GetFieldValue("openTags"), "openTags"), "OpenTags");
 
-            output.SetFieldValue(stagger, "hasPos", "HasPos");
+            output.SetFieldValue(Write(stagger.GetFieldValue("hasPos"), "hasPos"), "HasPos");
 
-            output.SetFieldValue(MapHashSet<string>(stagger, "allowedPrefixes"), "AllowedPrefixes");
+            output.SetFieldValue(Write(MapHashSet<string>(stagger, "allowedPrefixes"), "allowedPrefixes"), "AllowedPrefixes");
 
-            output.SetFieldValue(MapHashSet<string>(stagger, "allowedSuffixes"), "AllowedSuffixes");
+            output.SetFieldValue(Write(MapHashSet<string>(stagger, "allowedSuffixes"), "allowedSuffixes"), "AllowedSuffixes");
 
-            output.SetProperty(MapTaggedData(stagger, "taggedData"), "TaggedData");
+            output.SetProperty(Write(MapTaggedData(stagger, "taggedData"), "taggedData"), "TaggedData");
 
-            output.SetPropertyFromField(stagger, "hasNE", "HasNe");
+            output.SetProperty(Write(stagger.GetFieldValue("hasNE"), "hasNE"), "HasNe");
 
-            output.SetProperty(MapLexicon(stagger, "posLexicon"), "PosLexicon");
+            output.SetProperty(Write(MapLexicon(stagger, "posLexicon"), "posLexicon"), "PosLexicon");
 
-            output.SetProperty(MapList<Dictionary>(stagger, "posDictionaries"), "PosDictionaries");
+            output.SetProperty(Write(MapList<Dictionary>(stagger, "posDictionaries"), "posDictionaries"), "PosDictionaries");
 
-            output.SetProperty(MapList<Embedding>(stagger, "posEmbeddings"), "PosEmbeddings");
+            output.SetProperty(Write(MapList<Embedding>(stagger, "posEmbeddings"), "posEmbeddings"), "PosEmbeddings");
 
-            output.SetProperty(MapList<Dictionary>(stagger, "neDictionaries"), "NeDictionaries");
+            output.SetProperty(Write(MapList<Dictionary>(stagger, "neDictionaries"), "neDictionaries"), "NeDictionaries");
 
-            output.SetProperty(MapList<Embedding>(stagger, "neEmbeddings"), "NeEmbeddings");
+            output.SetProperty(Write(MapList<Embedding>(stagger, "neEmbeddings"), "neEmbeddings"), "NeEmbeddings");
 
-            output.SetPropertyFromField(stagger, "extendLexicon", "ExtendLexicon");
+            output.SetProperty(Write(stagger.GetFieldValue("extendLexicon"), "extendLexicon"), "ExtendLexicon");
 
-            output.SetPropertyFromField(stagger, "maxPosIters", "MaximumPosIterations");
+            output.SetProperty(Write(stagger.GetFieldValue("maxPosIters"), "maxPosIters"), "MaximumPosIterations");
 
-            output.SetPropertyFromField(stagger, "maxNEIters", "MaximumNeIterations");
+            output.SetProperty(Write(stagger.GetFieldValue("maxNEIters"), "maxNEIters"), "MaximumNeIterations");
+
+            fileStream.Flush();
+
+            fileStream.Close();
+
+            fileStream.Dispose();
+        }
+
+        public static T Map<T>()
+        {
+            fileStream = new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nbin", FileMode.Open);
+
+            T output = (T)FormatterServices.GetSafeUninitializedObject(typeof(T));
+
+            output.SetFieldValue(Read().Obj, "TrainingMode");
+
+            output.SetFieldValue(Read().Obj, "TokenTypeTags");
+
+            output.SetFieldValue(Read().Obj, "PosPerceptron");
+
+            output.SetFieldValue(Read().Obj, "NePerceptron");
+
+            output.SetFieldValue(Read().Obj, "PosBeamSize");
+
+            output.SetFieldValue(Read().Obj, "NeBeamSize");
+
+            output.SetFieldValue(Read().Obj, "OpenTags");
+
+            output.SetFieldValue(Read().Obj, "HasPos");
+
+            output.SetFieldValue(Read().Obj, "AllowedPrefixes");
+
+            output.SetFieldValue(Read().Obj, "AllowedSuffixes");
+
+            output.SetProperty(Read().Obj, "TaggedData");
+
+            output.SetProperty(Read().Obj, "HasNe");
+
+            output.SetProperty(Read().Obj, "PosLexicon");
+
+            output.SetProperty(Read().Obj, "PosDictionaries");
+
+            output.SetProperty(Read().Obj, "PosEmbeddings");
+
+            output.SetProperty(Read().Obj, "NeDictionaries");
+
+            output.SetProperty(Read().Obj, "NeEmbeddings");
+
+            output.SetProperty(Read().Obj, "ExtendLexicon");
+
+            output.SetProperty(Read().Obj, "MaximumPosIterations");
+
+            output.SetProperty(Read().Obj, "MaximumNeIterations");
+
+            fileStream.Close();
+
+            fileStream.Dispose();
 
             return output;
+        }
+
+        private static object Write(object value, string name)
+        {
+            Container container = new Container { Obj = value };
+
+            try
+            {
+                formatter.Serialize(fileStream, container);
+
+                fileStream.Flush();
+            }
+            catch
+            {
+                Console.WriteLine($"Failed on '{name}'.");
+
+                throw;
+            }
+
+            return value;
+        }
+
+        private static Container Read()
+        {
+            return (Container)formatter.Deserialize(fileStream);
         }
 
         private static T MapTo<T>(this object obj, string fieldName, Dictionary<string, string> fields) where T : class

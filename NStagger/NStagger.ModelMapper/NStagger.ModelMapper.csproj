@@ -69,6 +69,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Container.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Mapper.cs" />
     <Compile Include="Program.cs" />
