@@ -12,7 +12,7 @@ using ArrayList = java.util.ArrayList;
 
 namespace NStagger.ModelMapper
 {
-    public static class Mapper
+    public static partial class Mapper
     {
         private static readonly BinaryFormatter formatter = new BinaryFormatter();
 

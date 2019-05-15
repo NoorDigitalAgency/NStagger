@@ -1,16 +1,11 @@
 ﻿using System.IO;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using NStagger.Model;
 
-namespace NStagger.Cli
+namespace NStagger.ModelMapper
 {
-    public static class Mapper
+    public static partial class Mapper
     {
-        private static readonly BinaryFormatter formatter = new BinaryFormatter();
-
-        private static FileStream fileStream;
-
         public static T Map<T>()
         {
             fileStream = new FileStream(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nbin", FileMode.Open);

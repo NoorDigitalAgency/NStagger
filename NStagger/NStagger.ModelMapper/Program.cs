@@ -25,6 +25,16 @@ namespace NStagger.ModelMapper
             Console.WriteLine(stopwatch.Elapsed);
 
             stopwatch.Stop();
+
+            stopwatch = Stopwatch.StartNew();
+
+            SUCTagger sucTagger = Mapper.Map<SUCTagger>();
+
+            Console.WriteLine(stopwatch.Elapsed);
+
+            Console.WriteLine(sucTagger.TaggedData.Language);
+
+            stopwatch.Stop();
         }
     }
 }

@@ -210,30 +210,6 @@ namespace NStagger.Cli
 
         public static void Main(string[] args)
         {
-            BinaryFormatter binaryFormatter = new BinaryFormatter();
-
-            Stopwatch stopwatch = Stopwatch.StartNew();
-
-            SUCTagger sucTagger = Mapper.Map<SUCTagger>();
-
-            Console.WriteLine(stopwatch.Elapsed);
-
-            stopwatch.Stop();
-
-            stopwatch.Restart();
-
-            SUCTagger t = (SUCTagger) binaryFormatter.Deserialize(File.OpenRead(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nmodel"));//Mapper.Map<SUCTagger>();
-
-            Console.WriteLine(stopwatch.Elapsed);
-
-            stopwatch.Stop();
-            
-            //binaryFormatter.Serialize(File.OpenWrite(@"C:\Users\Rojan\Desktop\swedish.bin\swedish.nmodel"), sucTagger);
-
-            Console.WriteLine(stopwatch.Elapsed);
-
-            stopwatch.Stop();
-
             string lexiconFile = null;
 
             string trainFile = null;
