@@ -58,10 +58,10 @@ namespace NStagger
                 {
                     TaggedToken token = sentence[i];
 
-                    writer.Write($"{TokenToString(token, i, plain)}{Environment.NewLine}");
+                    writer.Write($"{TokenToString(token, i, plain)}\n");
                 }
 
-                writer.Write(Environment.NewLine);
+                writer.Write("\n");
             }
         }
 
@@ -84,15 +84,15 @@ namespace NStagger
 
                 TaggedToken gold = goldTokens[i];
 
-                writer.Write($"{TokenToString(token, i, plain)}{Environment.NewLine}");
+                writer.Write($"{TokenToString(token, i, plain)}\n");
 
                 if (!token.ConsistentWith(gold))
                 {
-                    writer.Write($"#{TokenToString(gold, i, plain)}{Environment.NewLine}");
+                    writer.Write($"#{TokenToString(gold, i, plain)}\n");
                 }
             }
 
-            writer.Write(Environment.NewLine);
+            writer.Write("\n");
         }
 
         private string TokenToString(TaggedToken token, int index, bool plain)
