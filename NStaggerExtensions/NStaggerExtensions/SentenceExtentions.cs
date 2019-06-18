@@ -32,7 +32,7 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?:^|\s|\.)[-*]\s*(\p{Lu}\w+)"), // 10
+            new Regex(@"(?:^|\s|\.)([-*•])\s+(\p{Lu}\w+)"), // 10
 
             new Regex(@"(?:\r\n|\n|\r)+"), // 11
 
@@ -82,7 +82,7 @@ namespace NStaggerExtensions
 
         public static IEnumerable<string> ToLines(this string text, bool code)
         {
-            text = regexList[10].IsMatch(text) ? regexList[10].Replace(text, "\n$1") : text;
+            text = regexList[10].IsMatch(text) ? regexList[10].Replace(text, "\n$1 $2") : text;
 
             text = regexList[13].IsMatch(text) ? regexList[13].Replace(text, "$1-$2-$3") : text;
 
