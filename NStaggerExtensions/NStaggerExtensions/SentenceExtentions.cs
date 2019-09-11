@@ -32,25 +32,25 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?:^|\s|\.)([-*•])\s+(\p{Lu}\w+)"), // 10
+            new Regex(@"(?:^|\s+|\.+)([-*•])\s+(\w+)"), // 10  @"(?:^|\s|\.)([-*•])\s+(\p{Lu}\w+)"
 
-            new Regex(@"(?:\r\n|\n|\r)+"), // 11
+            new Regex(@"(\S\.+)(\p{Lu})"), // 11
 
-            new Regex(@"([^\s]\.+)(\p{Lu})"), // 12
+            new Regex(@"\b((?:18|19|20)\d{2})\.([0-1]?[0-9])\.([0-1]?[0-9])\b"), // 12
 
-            new Regex(@"\b((?:18|19|20)\d{2})\.([0-1]?[0-9])\.([0-1]?[0-9])\b"), // 13
+            new Regex(@"\b(?:(?:\d*\.)?(?:\w+\.)+(?:\w+(?:\.\d*)?))"), // 13
 
-            new Regex(@"\b(?:(?:\d*\.)?(?:\w+\.)+(?:\w+(?:\.\d*)?))"), // 14
+            new Regex(@"(?:www\..+?\.\p{L}{2,}|(?:[\w-]*[\w]\.)+(?:com|org|net|se|nu|da|no|fi))"), // 14 
 
-            new Regex(@"(?:www\..+?\.\p{L}{2,}|(?:[\w-]*[\w]\.)+(?:com|org|net|se|nu|da|no|fi))"), // 15 
+            new Regex(@"\b((?i)(?<!www\.)\w+\.(?-i)N(?i)ET|\w+\.JS)\b"), // 15,
 
-            new Regex(@"\b((?i)(?<!www\.)\w+\.(?-i)N(?i)ET|\w+\.JS)\b"), // 16,
-
-            new Regex(@"\b(?:A|C|J|R|J|X|XBase|Z)\+{1,2}"), // 17,
+            new Regex(@"\b(?:A|C|J|R|J|X|XBase|Z)\+{1,2}"), // 16,
             
-            new Regex(@"\b(?:A|C|F|J|M|Q)#"), // 18,
+            new Regex(@"\b(?:A|C|F|J|M|Q)#"), // 17,
             
-            new Regex(@"([^\s][\!?])(\p{Lu})"), // 19
+            new Regex(@"([^\s][\!?])(\p{Lu})"), // 18
+
+            new Regex(@"(\s+|\.)([*•])\s*(\w+)"), // 19
         };
 
         private static readonly string[] exceptions =
@@ -83,10 +83,10 @@ namespace NStaggerExtensions
         public static IEnumerable<string> ToLines(this string text, bool code)
         {
             text = regexList[10].IsMatch(text) ? regexList[10].Replace(text, "\n$1 $2") : text;
+            
+            text = regexList[19].IsMatch(text) ? regexList[19].Replace(text, "$1\n$2 $3") : text;
 
-            text = regexList[13].IsMatch(text) ? regexList[13].Replace(text, "$1-$2-$3") : text;
-
-            text = regexList[11].IsMatch(text) ? regexList[11].Replace(text, "\n") : text;
+            text = regexList[12].IsMatch(text) ? regexList[12].Replace(text, "$1-$2-$3") : text;
 
             text = regexList[0].IsMatch(text) ? regexList[0].Replace(text, "$1\n$2") : text;
 
@@ -125,38 +125,38 @@ namespace NStaggerExtensions
                         words[i] += "\n";
                     }
                 }
-                else if (regexList[14].IsMatch(words[i]))
+                else if (regexList[13].IsMatch(words[i]))
                 {
                     string word = words[i].Replace(".", "").Trim('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', ' ', '\t', '\r', '\n');
 
                     if (!hashSet.Contains(word))
                     {
-                        if (regexList[12].IsMatch(words[i]) && !regexList[15].IsMatch(words[i]) && !regexList[16].IsMatch(words[i]))
+                        if (regexList[11].IsMatch(words[i]) && !regexList[14].IsMatch(words[i]) && !regexList[15].IsMatch(words[i]))
                         {
-                            words[i] = regexList[12].Replace(words[i], "$1\n$2");
+                            words[i] = regexList[11].Replace(words[i], "$1\n$2");
                         }
                     }
                 }
-                else if (regexList[19].IsMatch(words[i]))
+                else if (regexList[18].IsMatch(words[i]))
                 {
-                    if (regexList[19].IsMatch(words[i]))
+                    if (regexList[18].IsMatch(words[i]))
                     {
-                        words[i] = regexList[19].Replace(words[i], "$1\n$2");
+                        words[i] = regexList[18].Replace(words[i], "$1\n$2");
                     }
                 }
 
                 words[i] = code && regexList[9].IsMatch(words[i]) ? regexList[9].Replace(words[i], m => m.Value.Hex()) : words[i];
 
-                words[i] = code && regexList[17].IsMatch(words[i]) ? regexList[17].Replace(words[i], m => m.Value.Hex()) : words[i];
+                words[i] = code && regexList[16].IsMatch(words[i]) ? regexList[16].Replace(words[i], m => m.Value.Hex()) : words[i];
 
-                words[i] = code && regexList[18].IsMatch(words[i]) ? regexList[18].Replace(words[i], m => m.Value.Hex()) : words[i];
+                words[i] = code && regexList[17].IsMatch(words[i]) ? regexList[17].Replace(words[i], m => m.Value.Hex()) : words[i];
 
                 text += $"{words[i]} ";
             }
 
-            words[i] = code && regexList[17].IsMatch(words[i]) ? regexList[17].Replace(words[i], m => m.Value.Hex()) : words[i];
+            words[i] = code && regexList[16].IsMatch(words[i]) ? regexList[16].Replace(words[i], m => m.Value.Hex()) : words[i];
 
-            words[i] = code && regexList[18].IsMatch(words[i]) ? regexList[18].Replace(words[i], m => m.Value.Hex()) : words[i];
+            words[i] = code && regexList[17].IsMatch(words[i]) ? regexList[17].Replace(words[i], m => m.Value.Hex()) : words[i];
 
             text += $"{words[i]}";
 
@@ -164,7 +164,7 @@ namespace NStaggerExtensions
 
             foreach (string line in text.Split(new [] {'\n'}, StringSplitOptions.RemoveEmptyEntries))
             {
-                string lineToReturn = line.Trim();
+                string lineToReturn = line.TrimStart(' ');
 
                 if (!string.IsNullOrWhiteSpace(lineToReturn))
                 {
