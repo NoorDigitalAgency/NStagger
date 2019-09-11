@@ -17,7 +17,7 @@ namespace NStaggerExtensions.Cli
 
             foreach (string file in files)
             {
-                string outputFile = $"{Path.GetFileNameWithoutExtension(file)}-Processed.txt";
+                string outputFile = Path.GetFileName(file);
                 
                 string text = File.ReadAllText(file);
 
