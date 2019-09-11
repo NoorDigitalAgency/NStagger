@@ -32,7 +32,7 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?:^|\s+|\.+)([-*•])\s+(\w+)"), // 10  @"(?:^|\s|\.)([-*•])\s+(\p{Lu}\w+)"
+            new Regex(@"(?:^|\s+|\.+\s*|:\s+)([-*•])\s*(\p{L}\w+|\d\p{L}\w*)"), // 10  @"(?:^|\s+|\.+\s*)([-*•])\s+(\p{Lu}\w+)"
 
             new Regex(@"(\S\.+)(\p{Lu})"), // 11
 
@@ -50,7 +50,11 @@ namespace NStaggerExtensions
             
             new Regex(@"([^\s][\!?])(\p{Lu})"), // 18
 
-            new Regex(@"(\s+|\.)([*•])\s*(\w+)"), // 19
+            new Regex(@"(^|\s+|\.+\s*|:\s*)([*•])\s*(\w+)"), // 19
+
+            new Regex(@"([^?!\.:\s])(?:\s{0,1})(?:\r\n|\n|\r)(?:\s*)(\p{Ll})"), // 20
+
+            new Regex(@"^(\p{Lu}[\p{Lu}\s]+\p{Lu})(?:\s*)(\p{Lu}\p{Ll}|\d\w)"), // 21
         };
 
         private static readonly string[] exceptions =
@@ -160,16 +164,15 @@ namespace NStaggerExtensions
 
             text += $"{words[i]}";
 
-            text = regexList[7].Replace(text, " ");
+            text = regexList[7].IsMatch(text) ? regexList[7].Replace(text, " ") : text;
 
-            foreach (string line in text.Split(new [] {'\n'}, StringSplitOptions.RemoveEmptyEntries))
+            text = regexList[20].IsMatch(text) ? regexList[20].Replace(text, "$1 $2") : text;
+            
+            text = regexList[21].IsMatch(text) ? regexList[21].Replace(text, "$1\n$2") : text;
+
+            foreach (string line in text.Split(new [] {"\r\n", "\n", "\r"}, StringSplitOptions.None))
             {
-                string lineToReturn = line.TrimStart(' ');
-
-                if (!string.IsNullOrWhiteSpace(lineToReturn))
-                {
-                    yield return lineToReturn;
-                }
+                yield return line.Trim(' ');
             }
         }
 

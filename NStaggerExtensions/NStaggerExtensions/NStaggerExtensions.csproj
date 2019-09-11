@@ -6,7 +6,11 @@
     <Authors>Rojan Gh.</Authors>
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <ProjectReference Include="..\..\NStagger\NStagger\NStagger.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
     <PackageReference Include="NStagger" Version="1.0.0" />
   </ItemGroup>
 

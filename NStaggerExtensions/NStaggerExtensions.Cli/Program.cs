@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Swif.Core;
@@ -12,27 +11,24 @@ namespace NStaggerExtensions.Cli
     {
         static void Main()
         {
-            string text = File.ReadAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "Words Frequency Lists", "Output", "Test.txt"));
-            
-            Stopwatch stopwatch1 = Stopwatch.StartNew();
-
-            text = text.ToLines().Aggregate((s, s1) => $"{s}{Environment.NewLine}{s1}");
-
             SwedishWordIdentifierByFrequency swif = new SwedishWordIdentifierByFrequency(5);
             
-            stopwatch1.Stop();
-            
-            Console.WriteLine($"{stopwatch1.Elapsed:g}");
+            string[] files = Directory.GetFiles(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "Inputs"), "*.txt");
 
-            Stopwatch stopwatch2 = Stopwatch.StartNew();
+            foreach (string file in files)
+            {
+                string outputFile = $"{Path.GetFileNameWithoutExtension(file)}-Processed.txt";
+                
+                string text = File.ReadAllText(file);
 
-            (string output, List<string> list) = swif.SegmentString(text);
+                IEnumerable<string> enumerable = text.ToLines().ToList();
+            
+                text = enumerable.Aggregate((s, s1) => $"{s}{Environment.NewLine}{s1}");
 
-            stopwatch2.Stop();
+                (string output, List<string> _) = swif.SegmentString(text);
             
-            Console.WriteLine($"{stopwatch2.Elapsed:g}");
-            
-            File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "Words Frequency Lists", "Output", "Compare.txt"), output);
+                File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "Outputs", outputFile), output);
+            }
         }
     }
 }

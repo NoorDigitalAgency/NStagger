@@ -5,13 +5,15 @@ VisualStudioVersion = 16.0.29001.49
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NStaggerExtensions", "NStaggerExtensions\NStaggerExtensions.csproj", "{A8274DE2-259B-4A42-80BD-D32681015BF0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NStaggerExtensions.Cli", "NStaggerExtensions.Cli\NStaggerExtensions.Cli.csproj", "{85849774-F94F-4C5C-9C4E-406442ACBE19}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NStaggerExtensions.Cli", "NStaggerExtensions.Cli\NStaggerExtensions.Cli.csproj", "{85849774-F94F-4C5C-9C4E-406442ACBE19}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swif.Core", "..\..\Swif\Swif\Swif.Core\Swif.Core.csproj", "{FD64D691-FE9F-4206-8C33-F4B6BC702164}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Swif.Core", "..\..\Swif\Swif\Swif.Core\Swif.Core.csproj", "{FD64D691-FE9F-4206-8C33-F4B6BC702164}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Swif", "Swif", "{0E866A9C-CE83-40DA-B04D-EF3E5A80B2B7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swif.Extensions", "..\..\Swif\Swif\Swif.Extensions\Swif.Extensions.csproj", "{5B4FC90D-C270-4FBD-B5DA-4AC9EC15AC2E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Swif.Extensions", "..\..\Swif\Swif\Swif.Extensions\Swif.Extensions.csproj", "{5B4FC90D-C270-4FBD-B5DA-4AC9EC15AC2E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NStagger", "..\NStagger\NStagger\NStagger.csproj", "{F0CE46E7-EAC4-4DE2-9F84-E3E4F1BC5838}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,15 +37,19 @@ Global
 		{5B4FC90D-C270-4FBD-B5DA-4AC9EC15AC2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5B4FC90D-C270-4FBD-B5DA-4AC9EC15AC2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5B4FC90D-C270-4FBD-B5DA-4AC9EC15AC2E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0CE46E7-EAC4-4DE2-9F84-E3E4F1BC5838}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0CE46E7-EAC4-4DE2-9F84-E3E4F1BC5838}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0CE46E7-EAC4-4DE2-9F84-E3E4F1BC5838}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0CE46E7-EAC4-4DE2-9F84-E3E4F1BC5838}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {AB186EBA-EC8E-43A4-A9D3-F089BE1B8D63}
-	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{FD64D691-FE9F-4206-8C33-F4B6BC702164} = {0E866A9C-CE83-40DA-B04D-EF3E5A80B2B7}
 		{5B4FC90D-C270-4FBD-B5DA-4AC9EC15AC2E} = {0E866A9C-CE83-40DA-B04D-EF3E5A80B2B7}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AB186EBA-EC8E-43A4-A9D3-F089BE1B8D63}
 	EndGlobalSection
 EndGlobal

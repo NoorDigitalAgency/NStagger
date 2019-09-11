@@ -1,19 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp2.2</TargetFramework>
+        <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Terminal.Gui" Version="0.24.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\Swif\Swif\Swif.Core\Swif.Core.csproj" />
-    <ProjectReference Include="..\..\..\Swif\Swif\Swif.Extensions\Swif.Extensions.csproj" />
-    <ProjectReference Include="..\..\NStagger\NStagger\NStagger.csproj" />
-    <ProjectReference Include="..\NStaggerExtensions\NStaggerExtensions.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Swif\Swif\Swif.Core\Swif.Core.csproj"/>
+        <ProjectReference Include="..\..\..\Swif\Swif\Swif.Extensions\Swif.Extensions.csproj"/>
+        <ProjectReference Include="..\..\NStagger\NStagger\NStagger.csproj"/>
+        <ProjectReference Include="..\NStaggerExtensions\NStaggerExtensions.csproj"/>
+    </ItemGroup>
 
 </Project>
