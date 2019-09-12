@@ -197,6 +197,8 @@ namespace NStaggerExtensions
 
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
+            text = text.Trim('\n');
+            
             foreach (string line in text.Split('\n'))
             {
                 yield return line.Trim(' ');
