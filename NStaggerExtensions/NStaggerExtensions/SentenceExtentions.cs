@@ -66,7 +66,9 @@ namespace NStaggerExtensions
             
             new Regex(@"(\p{Lu}[\w]+:)(?: +)(\.?\p{Lu})"), // 26
             
-            new Regex(@"^\.\s*(\r\n|\n|\r)"), // 27
+            new Regex(@"^\s*\.\s*(\r\n|\n|\r)+", RegexOptions.Multiline), // 27
+            
+            new Regex(@"^(?:\s*\. +)(\w+)$", RegexOptions.Multiline), // 28
         };
 
         private static readonly string[] exceptions =
@@ -98,6 +100,8 @@ namespace NStaggerExtensions
             string pointLineBreak = pointDoubleLineBreak ? "\n\n" : "\n";
 
             text = text.Replace('\t', ' ');
+            
+            text = regexList[28].IsMatch(text) ? regexList[28].Replace(text, "- $1") : text;
             
             text = regexList[22].IsMatch(text) ? regexList[22].Replace(text, "") : text;
             
