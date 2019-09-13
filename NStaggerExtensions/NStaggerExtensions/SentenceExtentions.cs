@@ -62,13 +62,19 @@ namespace NStaggerExtensions
             
             new Regex(@"(\w\p{P})\[( |$)"), // 24
             
-            new Regex(@"(?:^ *)(\p{Lu}[\w ]+:)(?: +)(\. *\p{Lu})"), // 25
+            new Regex(@"(?:^ *)(\p{Lu}[\w ]+:)(?: +)(\. *[\p{Lu}\d])"), // 25
             
-            new Regex(@"(\p{Lu}[\w]+:)(?: +)(\.?\p{Lu})"), // 26
+            new Regex(@"(\p{Lu}[\w]+:)(?: +)(\.?[\p{Lu}\d])"), // 26
             
-            new Regex(@"^\s*\.\s*(\r\n|\n|\r)+", RegexOptions.Multiline), // 27
+            new Regex(@"^ *[^\p{L}\s] *(?:\r\n|\n|\r)", RegexOptions.Multiline), // 27
             
-            new Regex(@"^(?:\s*\. +)(\w+)$", RegexOptions.Multiline), // 28
+            new Regex(@"^(?:\s*\. +)(\w+)", RegexOptions.Multiline), // 28
+            
+            new Regex(@"[\u00a0 ]{2,}"), // 29
+            
+            new Regex(@"(?:[^\w]\u00a0|\u00a0[^\w])"), // 30
+            
+            new Regex(@"(?:^ *)(.+?)(\p{Lu}[\w ]+:)(?: +)(?:\. +)?([\p{Lu}\d])", RegexOptions.Multiline), // 31
         };
 
         private static readonly string[] exceptions =
@@ -99,29 +105,33 @@ namespace NStaggerExtensions
             
             string pointLineBreak = pointDoubleLineBreak ? "\n\n" : "\n";
 
-            text = text.Replace('\t', ' ');
+            text = text.Replace('\t', ' ').Replace('\v', ' ');
             
-            text = regexList[28].IsMatch(text) ? regexList[28].Replace(text, "- $1") : text;
+            text = regexList[29].Replace(text, match => Enumerable.Range(0, match.Length).Select(_ => " ").Aggregate((s, s1) => $"{s}{s1}"));
             
-            text = regexList[22].IsMatch(text) ? regexList[22].Replace(text, "") : text;
+            text = regexList[30].Replace(text, match => match.Value.Replace('\u00A0', ' '));
             
-            text = (regexList[24].IsMatch(text) ? regexList[24].Replace(text, "$1$2") : text).Replace('[', ' ');
+            text = regexList[28].Replace(text, "• $1");
             
-            text = regexList[10].IsMatch(text) ? regexList[10].Replace(text, $"$1{pointLineBreak}$2 $3") : text;
+            text = regexList[22].Replace(text, "").Replace('[', ' ');
             
-            text = regexList[19].IsMatch(text) ? regexList[19].Replace(text, $"$1{pointLineBreak}$2 $3") : text;
+            text = regexList[24].Replace(text, "$1$2").Replace('[', ' ');
+            
+            text = regexList[10].Replace(text, $"$1{pointLineBreak}$2 $3");
+            
+            text = regexList[19].Replace(text, $"$1{pointLineBreak}$2 $3");
 
-            text = regexList[12].IsMatch(text) ? regexList[12].Replace(text, "$1-$2-$3") : text;
+            text = regexList[12].Replace(text, "$1-$2-$3");
 
-            text = regexList[0].IsMatch(text) ? regexList[0].Replace(text, $"$1{lineBreak}$2") : text;
+            text = regexList[0].Replace(text, $"$1{lineBreak}$2");
 
-            text = regexList[1].IsMatch(text) ? regexList[1].Replace(text, $"$1{lineBreak}$2") : text;
+            text = regexList[1].Replace(text, $"$1{lineBreak}$2");
 
-            text = regexList[2].IsMatch(text) ? regexList[2].Replace(text, $"$1{lineBreak}$2") : text;
+            text = regexList[2].Replace(text, $"$1{lineBreak}$2");
 
-            text = regexList[3].IsMatch(text) ? regexList[3].Replace(text, $"$1{lineBreak}$2") : text;
+            text = regexList[3].Replace(text, $"$1{lineBreak}$2");
 
-            text = regexList[8].IsMatch(text) ? regexList[8].Replace(text, $"$1{lineBreak}$2") : text;
+            text = regexList[8].Replace(text, $"$1{lineBreak}$2");
 
             string[] words = regexList[7].Split(text);
 
@@ -164,10 +174,7 @@ namespace NStaggerExtensions
                 }
                 else if (regexList[18].IsMatch(words[i]))
                 {
-                    if (regexList[18].IsMatch(words[i]))
-                    {
-                        words[i] = regexList[18].Replace(words[i], $"$1{lineBreak}$2");
-                    }
+                    words[i] = regexList[18].Replace(words[i], $"$1{lineBreak}$2");
                 }
 
                 words[i] = code && regexList[9].IsMatch(words[i]) ? regexList[9].Replace(words[i], m => m.Value.Hex()) : words[i];
@@ -185,19 +192,21 @@ namespace NStaggerExtensions
 
             text += $"{words[i]}";
 
-            text = regexList[7].IsMatch(text) ? regexList[7].Replace(text, " ") : text;
+            text = regexList[7].Replace(text, " ");
 
-            text = regexList[20].IsMatch(text) ? regexList[20].Replace(text, "$1 $2") : text;
+            text = regexList[20].Replace(text, "$1 $2");
             
-            text = regexList[21].IsMatch(text) ? regexList[21].Replace(text, $"$1{lineBreak}$2") : text;
+            text = regexList[21].Replace(text, $"$1{lineBreak}$2");
             
-            text = regexList[23].IsMatch(text) ? regexList[23].Replace(text, $"{lineBreak}$1{lineBreak}$2") : text;
+            text = regexList[23].Replace(text, $"{lineBreak}$1{lineBreak}$2");
             
-            text = regexList[25].IsMatch(text) ? regexList[25].Replace(text, $"{lineBreak}$1{lineBreak}$2") : text;
+            text = regexList[25].Replace(text, $"{lineBreak}$1{lineBreak}$2");
             
-            text = regexList[26].IsMatch(text) ? regexList[26].Replace(text, $"{lineBreak}$1{lineBreak}$2") : text;
+            text = regexList[26].Replace(text, $"{lineBreak}$1{lineBreak}$2");
             
-            text = regexList[27].IsMatch(text) ? regexList[27].Replace(text, "") : text;
+            text = regexList[31].Replace(text, $"$1{lineBreak}$2{lineBreak}$3");
+            
+            text = regexList[27].Replace(text, "");
 
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
