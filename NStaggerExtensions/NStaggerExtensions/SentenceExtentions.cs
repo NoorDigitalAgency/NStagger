@@ -74,7 +74,7 @@ namespace NStaggerExtensions
             
             new Regex(@"(?:[^\w]\u00a0|\u00a0[^\w])"), // 30
             
-            new Regex(@"(?:^ *)(.+?)(\p{Lu}[\w ]+:)(?: +)(?:\. +)?([\p{Lu}\d])", RegexOptions.Multiline), // 31
+            new Regex(@"(?:^ *)(.+?)(\p{Lu}[\w ]+:)(?: +)?(\. *[\p{Lu}\d])", RegexOptions.Multiline), // 31
         };
 
         private static readonly string[] exceptions =
