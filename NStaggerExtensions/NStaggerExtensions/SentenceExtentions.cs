@@ -24,7 +24,7 @@ namespace NStaggerExtensions
 
             new Regex(@"(?:\.)[\p{Lu}\-]+(?:\.+)$"), // 5
 
-            new Regex(@"^(?:[ ]*['""([\u00bf\u00A1\p{Pi}]*[ ]*[\p{Lu}0-9])"), // 6
+            new Regex(@"^(?:[ ]*['""([\u00bf\u00A1\p{Pi}]*[ ]*[\p{Lu}0-9])", RegexOptions.Multiline), // 6
 
             new Regex(" +"), // 7
 
@@ -32,7 +32,7 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?<!^)(\. *|: +| +)([-*•+]) *(\p{L}\w+|\d\p{L}\w*)"), // 10
+            new Regex(@"(?<!^)(\. *|: +| +)([-*•+]) *(\p{L}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 10
 
             new Regex(@"(\S\.+)(\p{Lu})"), // 11
 
@@ -50,11 +50,11 @@ namespace NStaggerExtensions
             
             new Regex(@"([^ ][\!?])(\p{Lu})"), // 18
 
-            new Regex(@"(?<!^)(\. *|: +| +)([*•+]) *(\w+)"), // 19
+            new Regex(@"(?<!^)(\. *|: +| +)([*•+]) *(\w+)", RegexOptions.Multiline), // 19
 
             new Regex(@"([^?!\.: ])(?: {0,1})(?:\r\n|\n|\r)(?: *)(\p{Ll})"), // 20
 
-            new Regex(@"^ *(\p{Lu}[\p{Lu} ]+\p{Lu})(?: *)(\p{Lu}\p{Ll}|\d\w)"), // 21
+            new Regex(@"^ *(\p{Lu}[\p{Lu} ]+\p{Lu})(?: *)(\p{Lu}\p{Ll}|\d\w)", RegexOptions.Multiline), // 21
 
             new Regex(@"\[{2,}"), // 22
 
@@ -62,7 +62,7 @@ namespace NStaggerExtensions
             
             new Regex(@"(\w\p{P})\[( |$)"), // 24
             
-            new Regex(@"(?:^ *)(\p{Lu}[\w ]+:)(?: +)(\. *[\p{Lu}\d])"), // 25
+            new Regex(@"(?:^ *)(\p{Lu}[\w ]+:)(?: +)(\. *[\p{Lu}\d])", RegexOptions.Multiline), // 25
             
             new Regex(@"(\p{Lu}[\w]+:)(?: +)(\.?[\p{Lu}\d])"), // 26
             
