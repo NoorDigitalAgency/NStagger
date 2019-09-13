@@ -62,9 +62,9 @@ namespace NStaggerExtensions
             
             new Regex(@"(\w\p{P})\[( |$)"), // 24
             
-            new Regex(@"(?:^ *)(\p{Lu}[\w ]+:)(?: +)(\. *[\p{Lu}\d])", RegexOptions.Multiline), // 25
+            new Regex(@"(?:^ *)(\p{Lu}[\w ,\-/\\]+:)(?: *)((?:\. *)?[\p{Lu}\d])", RegexOptions.Multiline), // 25
             
-            new Regex(@"(\p{Lu}[\w]+:)(?: +)(\.?[\p{Lu}\d])"), // 26
+            new Regex(@"(\p{Lu}[\w ,\-/\\]+:)(?: *)((?:\. *)?[\p{Lu}\d])"), // 26
             
             new Regex(@"^ *[^\p{L}\s] *(?:\r\n|\n|\r)", RegexOptions.Multiline), // 27
             
@@ -73,8 +73,6 @@ namespace NStaggerExtensions
             new Regex(@"[\u00a0 ]{2,}"), // 29
             
             new Regex(@"(?:[^\w]\u00a0|\u00a0[^\w])"), // 30
-            
-            new Regex(@"(?:^ *)(.+?)(\p{Lu}[\w ]+:)(?: +)?(\. *[\p{Lu}\d])", RegexOptions.Multiline), // 31
         };
 
         private static readonly string[] exceptions =
@@ -203,8 +201,6 @@ namespace NStaggerExtensions
             text = regexList[25].Replace(text, $"{lineBreak}$1{lineBreak}$2");
             
             text = regexList[26].Replace(text, $"{lineBreak}$1{lineBreak}$2");
-            
-            text = regexList[31].Replace(text, $"$1{lineBreak}$2{lineBreak}$3");
             
             text = regexList[27].Replace(text, "");
 
