@@ -32,7 +32,7 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?<!^)(\. *|: +| +)([-*•+]) *(\p{L}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 10
+            new Regex(@"(?<!^)(\. *|: +| +)([-*•+]) *(\p{Lu}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 10
 
             new Regex(@"(\S\.+)(\p{Lu})"), // 11
 
@@ -50,7 +50,7 @@ namespace NStaggerExtensions
             
             new Regex(@"([^ ][\!?])(\p{Lu})"), // 18
 
-            new Regex(@"(?<!^)(\. *|: +| +)([*•+]) *(\w+)", RegexOptions.Multiline), // 19
+            new Regex(@"(?<!^)(\. *|: +| +)([*•+]) *(\p{Lu}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 19
 
             new Regex(@"([^?!\.: ])(?: {0,1})(?:\r\n|\n|\r)(?: *)(\p{Ll})"), // 20
 
@@ -73,6 +73,8 @@ namespace NStaggerExtensions
             new Regex(@"[\u00a0 ]{2,}"), // 29
             
             new Regex(@"(?:[^\w]\u00a0|\u00a0[^\w])"), // 30
+            
+            new Regex(@"(?:\n\s*){3,}"), // 31
         };
 
         private static readonly string[] exceptions =
@@ -207,6 +209,8 @@ namespace NStaggerExtensions
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
             text = text.Trim('\n');
+            
+            text = regexList[31].Replace(text, "\n\n");
             
             foreach (string line in text.Split('\n'))
             {
