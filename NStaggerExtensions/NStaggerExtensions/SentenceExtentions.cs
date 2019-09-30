@@ -32,7 +32,7 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?<!^)(\. *|: +| +)([-*•+]) *(\p{Lu}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 10
+            new Regex(@"(?<!^)(\. *|: +| +)([-*•]) *(\p{L}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 10
 
             new Regex(@"(\S\.+)(\p{Lu})"), // 11
 
@@ -50,31 +50,33 @@ namespace NStaggerExtensions
             
             new Regex(@"([^ ][\!?])(\p{Lu})"), // 18
 
-            new Regex(@"(?<!^)(\. *|: +| +)([*•+]) *(\p{Lu}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 19
+            new Regex(@"([^?!\.: ])(?: {0,1})(?:\r\n|\n|\r)(?: *)(\p{Ll})"), // 19
 
-            new Regex(@"([^?!\.: ])(?: {0,1})(?:\r\n|\n|\r)(?: *)(\p{Ll})"), // 20
+            new Regex(@"^ *(\p{Lu}[\p{Lu} ]+\p{Lu})(?: *)(\p{Lu}\p{Ll}|\d\w)", RegexOptions.Multiline), // 20
 
-            new Regex(@"^ *(\p{Lu}[\p{Lu} ]+\p{Lu})(?: *)(\p{Lu}\p{Ll}|\d\w)", RegexOptions.Multiline), // 21
+            new Regex(@"\[{2,}"), // 21
 
-            new Regex(@"\[{2,}"), // 22
+            new Regex(@"(?: {3,})(\p{Lu} \w|\p{Lu}\w+)"), // 22
+            
+            new Regex(@"(\w\p{P})\[( |$)"), // 23
+            
+            new Regex(@"(?:^ *)(\p{Lu}[\w ,\-/\\]+:)(?: *)((?:\. *)?[\p{Lu}\d])", RegexOptions.Multiline), // 24
+            
+            new Regex(@"(\p{Lu}[\w ,\-/\\]+:)(?: *)((?:\. *)?[\p{Lu}\d])"), // 25
+            
+            new Regex(@"^ *[^\p{L}\s] *(?:\r\n|\n|\r)", RegexOptions.Multiline), // 26
+            
+            new Regex(@"^(?:\s*\. +)(\w+)", RegexOptions.Multiline), // 27
+            
+            new Regex(@"[\u00a0 ]{2,}"), // 28
+            
+            new Regex(@"(?:[^\w]\u00a0|\u00a0[^\w])"), // 29
+            
+            new Regex(@"(?:\n\s*){3,}"), // 30
 
-            new Regex(@"(?: {3,})(\p{Lu} \w|\p{Lu}\w+)"), // 23
-            
-            new Regex(@"(\w\p{P})\[( |$)"), // 24
-            
-            new Regex(@"(?:^ *)(\p{Lu}[\w ,\-/\\]+:)(?: *)((?:\. *)?[\p{Lu}\d])", RegexOptions.Multiline), // 25
-            
-            new Regex(@"(\p{Lu}[\w ,\-/\\]+:)(?: *)((?:\. *)?[\p{Lu}\d])"), // 26
-            
-            new Regex(@"^ *[^\p{L}\s] *(?:\r\n|\n|\r)", RegexOptions.Multiline), // 27
-            
-            new Regex(@"^(?:\s*\. +)(\w+)", RegexOptions.Multiline), // 28
-            
-            new Regex(@"[\u00a0 ]{2,}"), // 29
-            
-            new Regex(@"(?:[^\w]\u00a0|\u00a0[^\w])"), // 30
-            
-            new Regex(@"(?:\n\s*){3,}"), // 31
+            new Regex(@"(?<!^)(\. *|: +| +)([+]) *(\p{Lu}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 31
+
+            new Regex(@" +(\d{1,2}[\.])(?: *(?:\r\n|\n|\r)+ *)(\w)", RegexOptions.Multiline), // 32
         };
 
         private static readonly string[] exceptions =
@@ -107,19 +109,19 @@ namespace NStaggerExtensions
 
             text = text.Replace('\t', ' ').Replace('\v', ' ');
             
-            text = regexList[29].Replace(text, match => Enumerable.Range(0, match.Length).Select(_ => " ").Aggregate((s, s1) => $"{s}{s1}"));
+            text = regexList[28].Replace(text, match => Enumerable.Range(0, match.Length).Select(_ => " ").Aggregate((s, s1) => $"{s}{s1}"));
             
-            text = regexList[30].Replace(text, match => match.Value.Replace('\u00A0', ' '));
+            text = regexList[29].Replace(text, match => match.Value.Replace('\u00A0', ' '));
             
-            text = regexList[28].Replace(text, "• $1");
+            text = regexList[27].Replace(text, "• $1");
             
-            text = regexList[22].Replace(text, "").Replace('[', ' ');
+            text = regexList[21].Replace(text, "").Replace('[', ' ');
             
-            text = regexList[24].Replace(text, "$1$2").Replace('[', ' ');
+            text = regexList[23].Replace(text, "$1$2").Replace('[', ' ');
             
             text = regexList[10].Replace(text, $"$1{pointLineBreak}$2 $3");
-            
-            text = regexList[19].Replace(text, $"$1{pointLineBreak}$2 $3");
+
+            text = regexList[31].Replace(text, $"$1{pointLineBreak}$2 $3");
 
             text = regexList[12].Replace(text, "$1-$2-$3");
 
@@ -194,23 +196,25 @@ namespace NStaggerExtensions
 
             text = regexList[7].Replace(text, " ");
 
-            text = regexList[20].Replace(text, "$1 $2");
+            text = regexList[19].Replace(text, "$1 $2");
+
+            text = regexList[32].Replace(text, $"{pointLineBreak}$1 $2");
             
-            text = regexList[21].Replace(text, $"$1{lineBreak}$2");
+            text = regexList[20].Replace(text, $"$1{lineBreak}$2");
             
-            text = regexList[23].Replace(text, $"{lineBreak}$1{lineBreak}$2");
+            text = regexList[22].Replace(text, $"{lineBreak}$1{lineBreak}$2");
+            
+            text = regexList[24].Replace(text, $"{lineBreak}$1{lineBreak}$2");
             
             text = regexList[25].Replace(text, $"{lineBreak}$1{lineBreak}$2");
             
-            text = regexList[26].Replace(text, $"{lineBreak}$1{lineBreak}$2");
-            
-            text = regexList[27].Replace(text, "");
+            text = regexList[26].Replace(text, "");
 
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
             text = text.Trim('\n');
             
-            text = regexList[31].Replace(text, "\n\n");
+            text = regexList[30].Replace(text, "\n\n");
             
             foreach (string line in text.Split('\n'))
             {
