@@ -76,7 +76,7 @@ namespace NStaggerExtensions
 
             new Regex(@"(?<!^)(\. *|: +| +)([+]) *(\p{Lu}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 31
 
-            new Regex(@"( +|^)(\d{1,2}[\.])(?: *(?:\r\n|\n|\r)+ *)(\w)", RegexOptions.Multiline), // 32
+            new Regex(@"(?: +|^)(\d{1,2}[\.])(?: *(?:\r\n|\n|\r)+ *)(\w)", RegexOptions.Multiline), // 32
 
             new Regex(@"\b(\d{4}:)\n+(\d{1,4})\b"), // 33
         };
