@@ -66,7 +66,7 @@ namespace NStaggerExtensions
             
             new Regex(@"^ *[^\p{L}\s] *(?:\r\n|\n|\r)", RegexOptions.Multiline), // 26
             
-            new Regex(@"(?:\s*\. *(?!net\b))(\w+)", RegexOptions.Multiline), // 27 @"^(?:\s*\. +)(\w+)"
+            new Regex(@"^(?:\s*\. +)(\w+)", RegexOptions.Multiline), // 27
             
             new Regex(@"[\u00a0 ]{2,}"), // 28
             
@@ -79,6 +79,8 @@ namespace NStaggerExtensions
             new Regex(@"(?: +|^)(\d{1,2}[\.])(?: *(?:\r\n|\n|\r)+ *)(\w)", RegexOptions.Multiline), // 32
 
             new Regex(@"\b(\d{4}:)\n+(\d{1,4})\b"), // 33
+
+            new Regex(@"(?:\s+\.|^\.)(\.(?i)net(?-i)\b|\w+)"), // 34
         };
 
         private static readonly string[] exceptions =
@@ -116,6 +118,8 @@ namespace NStaggerExtensions
             text = regexList[29].Replace(text, match => match.Value.Replace('\u00A0', ' '));
             
             text = regexList[27].Replace(text, "• $1");
+            
+            text = regexList[34].Replace(text, "• $1");
             
             text = regexList[21].Replace(text, "").Replace('[', ' ');
             
