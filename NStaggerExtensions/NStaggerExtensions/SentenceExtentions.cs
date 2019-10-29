@@ -32,7 +32,7 @@ namespace NStaggerExtensions
 
             new Regex(@"((?:\w*\.\w+)+(?:\.(?![\n]))?)"), // 9
 
-            new Regex(@"(?<!^)(\. *|: +| +)([-*•]) *(\p{L}\w+|\d\p{L}\w*)", RegexOptions.Multiline), // 10
+            new Regex(@"(?<!^)(\. *|: +| +)([-*•]) *(\.?\p{L}|\d\p{L})", RegexOptions.Multiline), // 10
 
             new Regex(@"(\S\.+)(\p{Lu})"), // 11
 
@@ -66,7 +66,7 @@ namespace NStaggerExtensions
             
             new Regex(@"^ *[^\p{L}\s] *(?:\r\n|\n|\r)", RegexOptions.Multiline), // 26
             
-            new Regex(@"^(?:\s*\. +)(\w+)", RegexOptions.Multiline), // 27
+            new Regex(@"(?:\s*\. *(?!net\b))(\w+)", RegexOptions.Multiline), // 27 @"^(?:\s*\. +)(\w+)"
             
             new Regex(@"[\u00a0 ]{2,}"), // 28
             
