@@ -81,6 +81,10 @@ namespace NStaggerExtensions
             new Regex(@"\b(\d{4}:)\n+(\d{1,4})\b"), // 33
 
             new Regex(@"(?:\s+\.|^\.)(\.(?i)net(?-i)\b|\w+)"), // 34
+
+            new Regex(@"(?:\r\n|\r|\n)\s*[^\w\d]+\s*(\r\n|\r|\n)"), // 35
+
+            new Regex(@"(\p{L})\s+\.(\r\n|\r|\n)"), // 36
         };
 
         private static readonly string[] exceptions =
@@ -119,7 +123,7 @@ namespace NStaggerExtensions
             
             text = regexList[27].Replace(text, "• $1");
             
-            text = regexList[34].Replace(text, "• $1");
+            text = regexList[34].Replace(text, " • $1");
             
             text = regexList[21].Replace(text, "").Replace('[', ' ');
             
@@ -217,6 +221,10 @@ namespace NStaggerExtensions
             text = regexList[26].Replace(text, "");
 
             text = regexList[33].Replace(text, "$1$2");
+
+            text = regexList[35].Replace(text, "$1");
+
+            text = regexList[36].Replace(text, "$1.$2");
 
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
